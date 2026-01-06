@@ -15,7 +15,9 @@ function App() {
     fecha: '', 
     hora: '12:00',
     invitados: 10,
-    tipoEvento: 'Particular', direccion: '', detalles: ''
+    tipoEvento: 'Particular', 
+    direccion: '', 
+    detalles: ''
   });
 
   useEffect(() => {
@@ -46,33 +48,34 @@ function App() {
     if (!reserva.fecha) return alert("Por favor selecciona una fecha en el calendario");
     setEnviando(true);
     try {
-      // Guardamos en Firebase
       await addDoc(collection(db, "reservas"), {
         ...reserva,
         fechaRegistro: new Date().toLocaleString(),
         estado: 'pendiente'
       });
 
-      // Definimos el texto con emojis
       const textoMensaje = `✨ *Nueva Solicitud Rosa Pastel* ✨\n\n` +
-      `👤 *Cliente:* ${reserva.nombre}\n` +
-      `📅 *Fecha:* ${reserva.fecha}\n` +
-      `🕒 *Hora:* ${reserva.hora} hrs\n` + // <-- Nueva línea
-      `👥 *Invitados:* ${reserva.invitados}\n` +
-      `🎉 *Evento:* ${reserva.tipoEvento}\n` +
-      `📍 *Lugar:* ${reserva.direccion}`;
+        `👤 *Cliente:* ${reserva.nombre}\n` +
+        `📅 *Fecha:* ${reserva.fecha}\n` +
+        `🕒 *Hora:* ${reserva.hora} hrs\n` +
+        `👥 *Invitados:* ${reserva.invitados}\n` +
+        `🎉 *Evento:* ${reserva.tipoEvento}\n` +
+        `📍 *Lugar:* ${reserva.direccion}`;
 
-      // Usamos encodeURIComponent para que los emojis viajen seguros
-      // El link correcto usa la variable 'textoMensaje'
       const urlFinal = `https://wa.me/56997920472?text=${encodeURIComponent(textoMensaje)}`;
       
       window.open(urlFinal, '_blank');
       alert("¡Solicitud enviada con éxito!");
 
-      // Limpiamos el formulario después de enviar
       setReserva({
-        nombre: '', telefono: '', fecha: '', invitados: 10,
-        tipoEvento: 'Particular', direccion: '', detalles: ''
+        nombre: '', 
+        telefono: '', 
+        fecha: '', 
+        hora: '12:00', 
+        invitados: 10,
+        tipoEvento: 'Particular', 
+        direccion: '', 
+        detalles: ''
       });
 
     } catch (err) { 
@@ -86,7 +89,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#fcf8f0] flex flex-col items-center py-10 px-4 text-[#4a3f35]">
-      {/* HEADER ELEGANTE */}
       <header className="mb-12 text-center">
         <h1 className="text-7xl font-serif text-[#c1a57d] mb-2 tracking-tighter">Rosa Pastel</h1>
         <div className="h-1 w-20 bg-[#c4b198] mx-auto mb-2"></div>
@@ -98,17 +100,17 @@ function App() {
         
         <form onSubmit={manejarReserva} className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
-          {/* Nombre y Apellido */}
           <div className="md:col-span-2 group">
             <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Nombre Completo</label>
-            <input type="text" name="nombre" onChange={handleChange} required 
+            <input type="text" name="nombre" value={reserva.nombre} onChange={handleChange} required 
               className="w-full p-5 bg-[#fcf8f0] border-none rounded-2xl focus:ring-2 focus:ring-[#c1a57d] transition-all outline-none text-[#4a3f35] placeholder-[#c4b198]"
               placeholder="¿A quién saludamos?"/>
           </div>
 
-          {/* Calendario con estilo de marca */}
+          {/* ÚNICO CALENDARIO CON SELECTOR DE HORA */}
           <div className="md:col-span-2 flex flex-col items-center py-6 bg-[#fcf8f0] rounded-[2.5rem] border border-[#efe4d5]">
-            <label className="text-[10px] font-bold text-[#c1a57d] uppercase tracking-widest mb-4">Selecciona tu Fecha Especial</label>
+            <label className="text-[10px] font-bold text-[#c1a57d] uppercase tracking-widest mb-4">Selecciona Fecha y Hora</label>
+            
             <div className="custom-calendar-container">
                 <Calendar 
                 onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})}
@@ -117,69 +119,57 @@ function App() {
                 className="main-calendar"
                 />
             </div>
+
+            <div className="mt-6 flex flex-col items-center">
+              <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest mb-2">¿A qué hora comienza el evento?</label>
+              <input 
+                type="time" 
+                name="hora"
+                value={reserva.hora}
+                onChange={handleChange}
+                className="p-3 bg-white border-2 border-[#efe4d5] rounded-xl text-[#c1a57d] font-bold outline-none focus:border-[#c1a57d] transition-all"
+              />
+            </div>
+
             {reserva.fecha && (
-              <div className="mt-4 px-6 py-2 bg-[#c1a57d] text-white rounded-full text-sm font-bold animate-bounce">
-                Día seleccionado: {reserva.fecha}
+              <div className="mt-4 px-6 py-2 bg-[#c1a57d] text-white rounded-full text-sm font-bold animate-pulse">
+                📅 {reserva.fecha} a las 🕒 {reserva.hora} hrs
               </div>
             )}
           </div>
 
-          {/* SECCIÓN DE FECHA Y HORA */}
-            <div className="md:col-span-2 flex flex-col items-center py-6 bg-[#fcf8f0] rounded-[2.5rem] border border-[#efe4d5]">
-            <label className="text-[10px] font-bold text-[#c1a57d] uppercase tracking-widest mb-4">Selecciona Fecha y Hora</label>
+          <div>
+            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">WhatsApp</label>
+            <input type="tel" name="telefono" value={reserva.telefono} placeholder="+569..." onChange={handleChange} required 
+              className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"/>
+          </div>
 
-            <Calendar 
-            onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})}
-            tileDisabled={({date}) => fechasOcupadas.includes(date.toISOString().split('T')[0])}
-            minDate={new Date()}
-            className="main-calendar"
-            />
-
-            {/* CAMPO DE HORA */}
-            <div className="mt-6 flex flex-col items-center">
-            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest mb-2">¿A qué hora comienza el evento?</label>
-            <input 
-              type="time" 
-              name="hora"
-              value={reserva.hora}
-              onChange={handleChange}
-              className="p-3 bg-white border-2 border-[#efe4d5] rounded-xl text-[#c1a57d] font-bold outline-none focus:border-[#c1a57d] transition-all"
-            />
-            </div>
-
-            {reserva.fecha && (
-            <div className="mt-4 px-6 py-2 bg-[#c1a57d] text-white rounded-full text-sm font-bold animate-pulse">
-              📅 {reserva.fecha} a las 🕒 {reserva.hora} hrs
-            </div>
-            )}
-            </div>
-
-          {/* Otros campos con el nuevo estilo */}
           <div>
             <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">N° de Invitados</label>
-            <input type="number" name="invitados" min="1" onChange={handleChange} required 
+            <input type="number" name="invitados" value={reserva.invitados} min="1" onChange={handleChange} required 
               className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"/>
           </div>
 
           <div>
             <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Tipo de Celebración</label>
-            <select name="tipoEvento" onChange={handleChange} className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none text-[#4a3f35]">
+            <select name="tipoEvento" value={reserva.tipoEvento} onChange={handleChange} className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none text-[#4a3f35]">
               <option value="Matrimonio">Matrimonio</option>
               <option value="Cumpleaños">Cumpleaños</option>
               <option value="Coffee Break">Coffee Break</option>
               <option value="Empresa">Evento Empresa</option>
+              <option value="Particular">Particular</option>
             </select>
           </div>
 
           <div className="md:col-span-2">
             <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Lugar del Evento</label>
-            <input type="text" name="direccion" placeholder="Ej: Sector Las Encinas, Temuco" onChange={handleChange} required 
+            <input type="text" name="direccion" value={reserva.direccion} placeholder="Ej: Sector Las Encinas, Temuco" onChange={handleChange} required 
               className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"/>
           </div>
 
           <div className="md:col-span-2">
             <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Dinos más detalles</label>
-            <textarea name="detalles" rows="3" onChange={handleChange} placeholder="Alergias, colores favoritos, horario..."
+            <textarea name="detalles" value={reserva.detalles} rows="3" onChange={handleChange} placeholder="Alergias, colores favoritos, horario..."
               className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"></textarea>
           </div>
           
