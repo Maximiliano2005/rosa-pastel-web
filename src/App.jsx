@@ -153,11 +153,10 @@ function App() {
           <div>
             <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Tipo de Celebración</label>
             <select name="tipoEvento" value={reserva.tipoEvento} onChange={handleChange} className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none text-[#4a3f35]">
-              <option value="Matrimonio">Matrimonio</option>
-              <option value="Cumpleaños">Cumpleaños</option>
-              <option value="Coffee Break">Coffee Break</option>
-              <option value="Empresa">Evento Empresa</option>
-              <option value="Particular">Particular</option>
+              <option value="Coffe Break">Coffe Break</option>
+              <option value="Catering">Catering</option>
+              <option value="Carros">Carros</option>
+              <option value="Chessee and wine">Chessee and wine</option>
             </select>
           </div>
 
