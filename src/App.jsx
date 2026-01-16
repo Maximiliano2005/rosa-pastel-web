@@ -20,7 +20,22 @@ function App() {
     detalles: ''
   });
 
+  const entrarAdmin = () => {
+    const clave = prompt("Introduce la clave de administradora:");
+    if (clave === "rosapastel2026") {
+      setVista('admin');
+    } else {
+      alert("Clave incorrecta");
+      window.location.href = window.location.pathname;
+    }
+  };
+
   useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    if (queryParams.has('admin')) {
+      entrarAdmin();
+    }
+
     const obtenerDisponibilidad = async () => {
       const q = query(collection(db, "reservas"), where("estado", "==", "confirmado"));
       const snapshot = await getDocs(q);
@@ -33,15 +48,9 @@ function App() {
       setFechasOcupadas(llenos);
     };
     obtenerDisponibilidad();
-  }, [vista]);
+  }, []);
 
   const handleChange = (e) => setReserva({ ...reserva, [e.target.name]: e.target.value });
-
-  const entrarAdmin = () => {
-    const clave = prompt("Introduce la clave de administradora:");
-    if (clave === "rosapastel2026") setVista('admin');
-    else alert("Clave incorrecta");
-  };
 
   const manejarReserva = async (e) => {
     e.preventDefault();
@@ -63,21 +72,13 @@ function App() {
         `📍 *Lugar:* ${reserva.direccion}`;
 
       const urlFinal = `https://wa.me/56997920472?text=${encodeURIComponent(textoMensaje)}`;
-      
       window.open(urlFinal, '_blank');
       alert("¡Solicitud enviada con éxito!");
 
       setReserva({
-        nombre: '', 
-        telefono: '', 
-        fecha: '', 
-        hora: '12:00', 
-        invitados: 10,
-        tipoEvento: 'Particular', 
-        direccion: '', 
-        detalles: ''
+        nombre: '', telefono: '', fecha: '', hora: '12:00', invitados: 10,
+        tipoEvento: 'Particular', direccion: '', detalles: ''
       });
-
     } catch (err) { 
       alert("Error: " + err.message); 
     } finally { 
@@ -85,11 +86,19 @@ function App() {
     }
   };
 
-  if (vista === 'admin') return <Admin volver={() => setVista('cliente')} />;
+  if (vista === 'admin') return <Admin volver={() => {
+    setVista('cliente');
+    window.location.href = window.location.pathname;
+  }} />;
 
   return (
     <div className="min-h-screen bg-[#fcf8f0] flex flex-col items-center py-10 px-4 text-[#4a3f35]">
       <header className="mb-12 text-center">
+        <img 
+          src="/logo.png" 
+          alt="Logo" 
+          className="w-32 h-32 rounded-full mx-auto mb-4 border-4 border-[#efe4d5] object-cover shadow-sm"
+        />
         <h1 className="text-7xl font-serif text-[#c1a57d] mb-2 tracking-tighter">Rosa Pastel</h1>
         <div className="h-1 w-20 bg-[#c4b198] mx-auto mb-2"></div>
         <p className="text-[#c4b198] uppercase tracking-[0.3em] text-xs font-bold">Banquetería & Eventos Temuco</p>
@@ -99,7 +108,6 @@ function App() {
         <h2 className="text-3xl font-serif text-[#c1a57d] mb-10 text-center italic">Cotiza tu próximo evento</h2>
         
         <form onSubmit={manejarReserva} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
           <div className="md:col-span-2 group">
             <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Nombre Completo</label>
             <input type="text" name="nombre" value={reserva.nombre} onChange={handleChange} required 
@@ -107,19 +115,16 @@ function App() {
               placeholder="¿A quién saludamos?"/>
           </div>
 
-          {/* ÚNICO CALENDARIO CON SELECTOR DE HORA */}
           <div className="md:col-span-2 flex flex-col items-center py-6 bg-[#fcf8f0] rounded-[2.5rem] border border-[#efe4d5]">
             <label className="text-[10px] font-bold text-[#c1a57d] uppercase tracking-widest mb-4">Selecciona Fecha y Hora</label>
-            
             <div className="custom-calendar-container">
                 <Calendar 
-                onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})}
-                tileDisabled={({date}) => fechasOcupadas.includes(date.toISOString().split('T')[0])}
-                minDate={new Date()}
-                className="main-calendar"
+                  onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})}
+                  tileDisabled={({date}) => fechasOcupadas.includes(date.toISOString().split('T')[0])}
+                  minDate={new Date()}
+                  className="main-calendar"
                 />
             </div>
-
             <div className="mt-6 flex flex-col items-center">
               <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest mb-2">¿A qué hora comienza el evento?</label>
               <input 
@@ -130,7 +135,6 @@ function App() {
                 className="p-3 bg-white border-2 border-[#efe4d5] rounded-xl text-[#c1a57d] font-bold outline-none focus:border-[#c1a57d] transition-all"
               />
             </div>
-
             {reserva.fecha && (
               <div className="mt-4 px-6 py-2 bg-[#c1a57d] text-white rounded-full text-sm font-bold animate-pulse">
                 📅 {reserva.fecha} a las 🕒 {reserva.hora} hrs
@@ -181,7 +185,6 @@ function App() {
 
       <footer className="mt-16 text-center">
         <p className="text-[#c4b198] text-[10px] uppercase tracking-[0.2em] font-bold">Temuco, Chile</p>
-        <button onClick={entrarAdmin} className="mt-4 text-[#c4b198] text-[9px] underline uppercase tracking-widest hover:text-[#c1a57d]">Gestión Interna</button>
       </footer>
     </div>
   );
