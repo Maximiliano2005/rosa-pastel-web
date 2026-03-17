@@ -4,6 +4,7 @@ import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import Admin from './Admin';
+import emailjs from '@emailjs/browser';
 
 function App() {
   const [vista, setVista] = useState('cliente');
@@ -56,6 +57,7 @@ function App() {
     e.preventDefault();
     if (!reserva.fecha) return alert("Por favor selecciona una fecha en el calendario");
     setEnviando(true);
+
     try {
       await addDoc(collection(db, "reservas"), {
         ...reserva,
@@ -63,17 +65,24 @@ function App() {
         estado: 'pendiente'
       });
 
-      const textoMensaje = `✨ *Nueva Solicitud Rosa Pastel* ✨\n\n` +
-        `👤 *Cliente:* ${reserva.nombre}\n` +
-        `📅 *Fecha:* ${reserva.fecha}\n` +
-        `🕒 *Hora:* ${reserva.hora} hrs\n` +
-        `👥 *Invitados:* ${reserva.invitados}\n` +
-        `🎉 *Evento:* ${reserva.tipoEvento}\n` +
-        `📍 *Lugar:* ${reserva.direccion}`;
+      const serviceID = 'service_skm23ep';
+      const templateID = 'template_vhlomqs';
+      const publicKey = '56AEmrh5uSxllA5ot';
 
-      const urlFinal = `https://wa.me/56997920472?text=${encodeURIComponent(textoMensaje)}`;
-      window.open(urlFinal, '_blank');
-      alert("¡Solicitud enviada con éxito!");
+      const templateParams = {
+        nombre: reserva.nombre,
+        telefono: reserva.telefono,
+        fecha: reserva.fecha,
+        hora: reserva.hora,
+        invitados: reserva.invitados,
+        tipoEvento: reserva.tipoEvento,
+        direccion: reserva.direccion,
+        detalles: reserva.detalles
+      };
+
+      await emailjs.send(serviceID, templateID, templateParams, publicKey);
+
+      alert("¡Solicitud enviada con éxito! Revisa el correo de la empresa.");
 
       setReserva({
         nombre: '', telefono: '', fecha: '', hora: '12:00', invitados: 10,
@@ -191,3 +200,5 @@ function App() {
 }
 
 export default App;
+
+//HOlaaa
