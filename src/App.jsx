@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from './firebase'; 
-import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, query, getDocs } from 'firebase/firestore';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import Admin from './Admin';
@@ -9,46 +9,42 @@ import emailjs from '@emailjs/browser';
 function App() {
   const [vista, setVista] = useState('cliente');
   const [enviando, setEnviando] = useState(false);
-  const [fechasOcupadas, setFechasOcupadas] = useState([]);
+  const [servicios, setServicios] = useState([]); // Estado para servicios dinámicos
   const [reserva, setReserva] = useState({
     nombre: '', 
+    rut: '',
+    email: '',
     telefono: '', 
     fecha: '', 
     hora: '12:00',
     invitados: 10,
-    tipoEvento: 'Particular', 
+    tipoEvento: '', 
     direccion: '', 
     detalles: ''
   });
 
   const entrarAdmin = () => {
     const clave = prompt("Introduce la clave de administradora:");
-    if (clave === "rosapastel2026") {
-      setVista('admin');
-    } else {
-      alert("Clave incorrecta");
-      window.location.href = window.location.pathname;
-    }
+    if (clave === "rosapastel2026") setVista('admin');
+    else alert("Clave incorrecta");
   };
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
-    if (queryParams.has('admin')) {
-      entrarAdmin();
-    }
+    if (queryParams.has('admin')) entrarAdmin();
 
-    const obtenerDisponibilidad = async () => {
-      const q = query(collection(db, "reservas"), where("estado", "==", "confirmado"));
-      const snapshot = await getDocs(q);
-      const conteo = {};
-      snapshot.forEach(doc => {
-        const d = doc.data().fecha;
-        conteo[d] = (conteo[d] || 0) + 1;
-      });
-      const llenos = Object.keys(conteo).filter(fecha => conteo[fecha] >= 2);
-      setFechasOcupadas(llenos);
+    // CARGAR SERVICIOS DESDE FIREBASE
+    const obtenerServicios = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "servicios"));
+        const lista = querySnapshot.docs.map(doc => doc.data().nombre);
+        setServicios(lista);
+        if (lista.length > 0) setReserva(prev => ({ ...prev, tipoEvento: lista[0] }));
+      } catch (error) {
+        console.error("Error cargando servicios:", error);
+      }
     };
-    obtenerDisponibilidad();
+    obtenerServicios();
   }, []);
 
   const handleChange = (e) => setReserva({ ...reserva, [e.target.name]: e.target.value });
@@ -59,146 +55,80 @@ function App() {
     setEnviando(true);
 
     try {
+      // Guardar en Firebase
       await addDoc(collection(db, "reservas"), {
         ...reserva,
         fechaRegistro: new Date().toLocaleString(),
         estado: 'pendiente'
       });
 
+      // EmailJS
       const serviceID = 'service_skm23ep';
       const templateID = 'template_vhlomqs';
       const publicKey = '56AEmrh5uSxllA5ot';
+      await emailjs.send(serviceID, templateID, reserva, publicKey);
 
-      const templateParams = {
-        nombre: reserva.nombre,
-        telefono: reserva.telefono,
-        fecha: reserva.fecha,
-        hora: reserva.hora,
-        invitados: reserva.invitados,
-        tipoEvento: reserva.tipoEvento,
-        direccion: reserva.direccion,
-        detalles: reserva.detalles
-      };
-
-      await emailjs.send(serviceID, templateID, templateParams, publicKey);
-
-      alert("¡Solicitud enviada con éxito! Revisa el correo de la empresa.");
-
+      alert("¡Solicitud enviada! Nos contactaremos pronto.");
       setReserva({
-        nombre: '', telefono: '', fecha: '', hora: '12:00', invitados: 10,
-        tipoEvento: 'Particular', direccion: '', detalles: ''
+        nombre: '', rut: '', email: '', telefono: '', fecha: '', 
+        hora: '12:00', invitados: 10, tipoEvento: servicios[0] || '', 
+        direccion: '', detalles: ''
       });
-    } catch (err) { 
-      alert("Error: " + err.message); 
-    } finally { 
-      setEnviando(false); 
-    }
+    } catch (err) { alert("Error: " + err.message); } finally { setEnviando(false); }
   };
 
-  if (vista === 'admin') return <Admin volver={() => {
-    setVista('cliente');
-    window.location.href = window.location.pathname;
-  }} />;
+  if (vista === 'admin') return <Admin volver={() => setVista('cliente')} />;
 
+  // --- Busca el final de tu App.jsx y reemplaza el return por este ---
   return (
-    <div className="min-h-screen bg-[#fcf8f0] flex flex-col items-center py-10 px-4 text-[#4a3f35]">
+    <div className="min-h-screen bg-[#fcf8f0] flex flex-col items-center py-12 px-4 text-[#4a3f35]">
       <header className="mb-12 text-center">
-        <img 
-          src="/logo.png" 
-          alt="Logo" 
-          className="w-32 h-32 rounded-full mx-auto mb-4 border-4 border-[#efe4d5] object-cover shadow-sm"
-        />
+        <img src="/logo.png" alt="Logo" className="w-32 h-32 rounded-full mx-auto mb-4 border-4 border-[#efe4d5] object-cover shadow-sm" />
         <h1 className="text-7xl font-serif text-[#c1a57d] mb-2 tracking-tighter">Rosa Pastel</h1>
         <div className="h-1 w-20 bg-[#c4b198] mx-auto mb-2"></div>
-        <p className="text-[#c4b198] uppercase tracking-[0.3em] text-xs font-bold">Banquetería & Eventos Temuco</p>
+        <p className="text-[#c4b198] uppercase tracking-[0.3em] text-[10px] font-bold">Banquetería & Eventos Temuco</p>
       </header>
 
-      <main className="bg-white shadow-sm rounded-[3rem] p-8 md:p-12 max-w-3xl w-full border border-[#efe4d5]">
-        <h2 className="text-3xl font-serif text-[#c1a57d] mb-10 text-center italic">Cotiza tu próximo evento</h2>
+      <main className="bg-white shadow-sm rounded-[3rem] p-8 md:p-16 max-w-4xl w-full border border-[#efe4d5]">
+        <h2 className="text-3xl font-serif text-[#c1a57d] mb-12 text-center italic">Cotiza tu próximo evento</h2>
         
-        <form onSubmit={manejarReserva} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="md:col-span-2 group">
-            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Nombre Completo</label>
-            <input type="text" name="nombre" value={reserva.nombre} onChange={handleChange} required 
-              className="w-full p-5 bg-[#fcf8f0] border-none rounded-2xl focus:ring-2 focus:ring-[#c1a57d] transition-all outline-none text-[#4a3f35] placeholder-[#c4b198]"
-              placeholder="¿A quién saludamos?"/>
+        <form onSubmit={manejarReserva} className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+          {/* ... Todo tu formulario igual ... */}
+          {/* (Asegúrate de mantener los inputs de nombre, rut, email, etc.) */}
+          <div className="space-y-6">
+            <h3 className="text-[#c4b198] text-[10px] font-bold uppercase tracking-widest border-b border-[#fcf8f0] pb-2">Datos de Contacto</h3>
+            <input type="text" name="nombre" value={reserva.nombre} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Nombre Completo"/>
+            <input type="text" name="rut" value={reserva.rut} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="RUT"/>
+            <input type="email" name="email" value={reserva.email} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="E-mail"/>
+            <input type="tel" name="telefono" value={reserva.telefono} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="WhatsApp"/>
           </div>
 
-          <div className="md:col-span-2 flex flex-col items-center py-6 bg-[#fcf8f0] rounded-[2.5rem] border border-[#efe4d5]">
-            <label className="text-[10px] font-bold text-[#c1a57d] uppercase tracking-widest mb-4">Selecciona Fecha y Hora</label>
-            <div className="custom-calendar-container">
-                <Calendar 
-                  onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})}
-                  tileDisabled={({date}) => fechasOcupadas.includes(date.toISOString().split('T')[0])}
-                  minDate={new Date()}
-                  className="main-calendar"
-                />
+          <div className="space-y-6">
+            <h3 className="text-[#c4b198] text-[10px] font-bold uppercase tracking-widest border-b border-[#fcf8f0] pb-2">Fecha y Servicio</h3>
+            <div className="flex flex-col items-center py-4 bg-[#fcf8f0] rounded-[2.5rem] border border-[#efe4d5]">
+              <Calendar onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})} minDate={new Date()} />
             </div>
-            <div className="mt-6 flex flex-col items-center">
-              <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest mb-2">¿A qué hora comienza el evento?</label>
-              <input 
-                type="time" 
-                name="hora"
-                value={reserva.hora}
-                onChange={handleChange}
-                className="p-3 bg-white border-2 border-[#efe4d5] rounded-xl text-[#c1a57d] font-bold outline-none focus:border-[#c1a57d] transition-all"
-              />
+            <div className="grid grid-cols-2 gap-4">
+               <input type="number" name="invitados" value={reserva.invitados} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" />
+               <select name="tipoEvento" value={reserva.tipoEvento} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none">
+                 {servicios.map(s => <option key={s} value={s}>{s}</option>)}
+               </select>
             </div>
-            {reserva.fecha && (
-              <div className="mt-4 px-6 py-2 bg-[#c1a57d] text-white rounded-full text-sm font-bold animate-pulse">
-                📅 {reserva.fecha} a las 🕒 {reserva.hora} hrs
-              </div>
-            )}
           </div>
 
-          <div>
-            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">WhatsApp</label>
-            <input type="tel" name="telefono" value={reserva.telefono} placeholder="+569..." onChange={handleChange} required 
-              className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"/>
+          <div className="md:col-span-2 space-y-4">
+             <input type="text" name="direccion" value={reserva.direccion} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Dirección"/>
+             <textarea name="detalles" value={reserva.detalles} rows="2" onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Detalles..."></textarea>
           </div>
 
-          <div>
-            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">N° de Invitados</label>
-            <input type="number" name="invitados" value={reserva.invitados} min="1" onChange={handleChange} required 
-              className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"/>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Tipo de Celebración</label>
-            <select name="tipoEvento" value={reserva.tipoEvento} onChange={handleChange} className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none text-[#4a3f35]">
-              <option value="Coffe Break">Coffe Break</option>
-              <option value="Catering">Catering</option>
-              <option value="Carros">Carros</option>
-              <option value="Chessee and wine">Chessee and wine</option>
-            </select>
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Lugar del Evento</label>
-            <input type="text" name="direccion" value={reserva.direccion} placeholder="Ej: Sector Las Encinas, Temuco" onChange={handleChange} required 
-              className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"/>
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="text-[10px] font-bold text-[#c4b198] uppercase tracking-widest ml-4 mb-2 block">Dinos más detalles</label>
-            <textarea name="detalles" value={reserva.detalles} rows="3" onChange={handleChange} placeholder="Alergias, colores favoritos, horario..."
-              className="w-full p-5 bg-[#fcf8f0] rounded-2xl outline-none focus:ring-2 focus:ring-[#c1a57d]"></textarea>
-          </div>
-          
-          <button type="submit" disabled={enviando}
-            className="md:col-span-2 py-5 bg-[#c1a57d] text-white font-bold rounded-2xl hover:bg-[#a68d66] shadow-xl shadow-[#c1a57d]/20 transition-all active:scale-95 disabled:bg-gray-300 uppercase tracking-widest text-sm">
-            {enviando ? 'Procesando...' : 'Consultar Disponibilidad'}
+          <button type="submit" disabled={enviando} className="md:col-span-2 py-5 bg-[#c1a57d] text-white font-bold rounded-2xl uppercase tracking-widest">
+            {enviando ? 'Enviando...' : 'Consultar Disponibilidad'}
           </button>
         </form>
       </main>
-
-      <footer className="mt-16 text-center">
-        <p className="text-[#c4b198] text-[10px] uppercase tracking-[0.2em] font-bold">Temuco, Chile</p>
-      </footer>
+      {/* QUITAMOS EL FOOTER CON EL BOTÓN */}
     </div>
   );
 }
 
 export default App;
-
-//HOlaaa
