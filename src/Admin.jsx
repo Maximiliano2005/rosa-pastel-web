@@ -11,31 +11,36 @@ function Admin({ volver }) {
   const [servicios, setServicios] = useState([]);
   const [nuevoSrv, setNuevoSrv] = useState("");
 
-  // Estado para la cotización: Precios + Glosa personalizada
+  // Estado para la cotización: Precios + Glosa descriptiva
   const [precios, setPrecios] = useState({ pPersona: 0, transporte: 0, extras: 0, glosa: '' });
 
-  // 1. CARGAR DATOS EN TIEMPO REAL
   useEffect(() => {
-    // Escuchar reservas
     const qR = query(collection(db, "reservas"), orderBy("fechaRegistro", "desc"));
     const unsubR = onSnapshot(qR, (snap) => {
       setReservas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setCargando(false);
     });
-
-    // Escuchar servicios (Tipos de evento)
     const unsubS = onSnapshot(collection(db, "servicios"), (snap) => {
       setServicios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-
     return () => { unsubR(); unsubS(); };
   }, []);
 
-  // 2. FUNCIONES DE GESTIÓN
   const actualizarEstado = async (id, nuevoEstado) => {
     try {
       await updateDoc(doc(db, "reservas", id), { estado: nuevoEstado });
-    } catch (error) { console.error("Error al actualizar:", error); }
+      if(nuevoEstado === 'confirmado') alert("¡Evento confirmado en el sistema! 🌸");
+    } catch (error) { console.error("Error:", error); }
+  };
+
+  // FUNCIÓN PARA ABRIR GMAIL CON EL CORREO DEL CLIENTE YA PUESTO
+  const enviarEmailManual = (res) => {
+    const asunto = encodeURIComponent(`Presupuesto Rosa Pastel - Evento ${res.tipoEvento}`);
+    const cuerpo = encodeURIComponent(`Hola ${res.nombre},\n\nEsperamos que estés muy bien. Adjuntamos la cotización para tu evento de ${res.tipoEvento} solicitado para el día ${res.fecha}.\n\nPara confirmar la fecha, solicitamos el abono del 50%. Quedamos atentos a tus dudas.\n\nCariños,\nRosa Pastel Banquetería.`);
+    
+    // Aquí usamos res.email para que aparezca automáticamente en el "Para:"
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${res.email}&su=${asunto}&body=${cuerpo}`;
+    window.open(gmailUrl, '_blank');
   };
 
   const agregarServicio = async () => {
@@ -43,16 +48,9 @@ function Admin({ volver }) {
     try {
       await addDoc(collection(db, "servicios"), { nombre: nuevoSrv });
       setNuevoSrv("");
-    } catch (error) { alert("Error al agregar: " + error.message); }
+    } catch (error) { alert("Error: " + error.message); }
   };
 
-  const eliminarServicio = async (id) => {
-    if (window.confirm("¿Eliminar este servicio de la lista?")) {
-      await deleteDoc(doc(db, "servicios", id));
-    }
-  };
-
-  // 3. GENERADOR DE PDF
   const generarPDFOficial = (res, valores) => {
     try {
       const docPDF = new jsPDF();
@@ -90,7 +88,7 @@ function Admin({ volver }) {
         head: [['DESCRIPCIÓN', 'CANT.', 'UNITARIO', 'TOTAL']],
         body: [
           [`SERVICIO ${res.tipoEvento?.toUpperCase()}`, res.invitados, `$${Number(valores.pPersona).toLocaleString('es-CL')}`, `$${netoB.toLocaleString('es-CL')}`],
-          ['TRANSPORTE', '1', `$${Number(valores.transporte).toLocaleString('es-CL')}`, `$${Number(valores.transporte).toLocaleString('es-CL')}`],
+          ['LOGÍSTICA Y TRANSPORTE', '1', `$${Number(valores.transporte).toLocaleString('es-CL')}`, `$${Number(valores.transporte).toLocaleString('es-CL')}`],
           ['ADICIONALES', '1', `$${Number(valores.extras).toLocaleString('es-CL')}`, `$${Number(valores.extras).toLocaleString('es-CL')}`],
         ],
         headStyles: { fillColor: gold }
@@ -117,10 +115,10 @@ function Admin({ volver }) {
           <button onClick={volver} className="text-xs font-bold uppercase text-[#c4b198] border-b border-[#c4b198] pb-1">Cerrar Sesión</button>
         </header>
 
-        {/* LISTADO DE COTIZACIONES (Compacto) */}
+        {/* LISTADO DE SOLICITUDES */}
         <div className="space-y-3 mb-12">
           {reservas.map((res) => (
-            <div key={res.id} className="bg-white p-4 rounded-[2rem] border border-[#efe4d5] flex flex-col md:flex-row justify-between items-center gap-4">
+            <div key={res.id} className="bg-white p-4 rounded-[1.8rem] border border-[#efe4d5] flex flex-col md:flex-row justify-between items-center gap-4 hover:shadow-sm transition-all">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold">{res.nombre}</h2>
@@ -132,21 +130,31 @@ function Admin({ volver }) {
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => setReservaParaCotizar(res)} className="bg-[#fcf8f0] text-[#c1a57d] px-4 py-2 rounded-xl text-[10px] font-bold uppercase hover:bg-[#c1a57d] hover:text-white transition-all">
-                  Cotizar
+                <button onClick={() => setReservaParaCotizar(res)} className="bg-[#fcf8f0] text-[#c1a57d] px-4 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-[#c1a57d] hover:text-white transition-all">
+                  1. Cotizar
                 </button>
+                
                 {res.estado === 'cotizado' && (
-                  <button onClick={() => actualizarEstado(res.id, 'confirmado')} className="bg-green-500 text-white px-4 py-2 rounded-xl text-[10px] font-bold uppercase shadow-lg shadow-green-100">Aceptar</button>
+                  <button onClick={() => enviarEmailManual(res)} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[9px] font-bold uppercase border border-blue-100 hover:bg-blue-600 hover:text-white transition-all">
+                    2. Enviar Gmail
+                  </button>
                 )}
+
+                {res.estado === 'cotizado' && (
+                  <button onClick={() => actualizarEstado(res.id, 'confirmado')} className="bg-green-500 text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase shadow-lg shadow-green-100">
+                    3. Aceptar
+                  </button>
+                )}
+
                 <button onClick={async () => { if(window.confirm("¿Eliminar?")) await deleteDoc(doc(db, "reservas", res.id)); }} className="p-2 text-red-200 hover:text-red-400">🗑️</button>
               </div>
             </div>
           ))}
         </div>
 
-        {/* GESTIÓN DE SERVICIOS DINÁMICOS */}
+        {/* GESTIÓN DE SERVICIOS */}
         <div className="bg-white rounded-[2.5rem] p-8 border border-[#efe4d5]">
-          <h3 className="text-xl font-serif text-[#c1a57d] mb-4">Servicios en Formulario</h3>
+          <h3 className="text-xl font-serif text-[#c1a57d] mb-4">Servicios Disponibles</h3>
           <div className="flex gap-2 mb-6">
             <input value={nuevoSrv} onChange={(e)=>setNuevoSrv(e.target.value)} placeholder="Nuevo tipo de evento..." className="flex-1 p-3 bg-[#fcf8f0] rounded-xl outline-none text-sm" />
             <button onClick={agregarServicio} className="bg-[#c1a57d] text-white px-6 rounded-xl font-bold text-xs">AÑADIR</button>
@@ -154,15 +162,15 @@ function Admin({ volver }) {
           <div className="flex flex-wrap gap-2">
             {servicios.map(s => (
               <div key={s.id} className="bg-[#fcf8f0] px-3 py-1.5 rounded-full flex items-center gap-2 border border-[#efe4d5]">
-                <span className="text-[11px] font-bold">{s.nombre}</span>
-                <button onClick={()=>eliminarServicio(s.id)} className="text-red-300">✕</button>
+                <span className="text-[11px] font-bold text-[#4a3f35]">{s.nombre}</span>
+                <button onClick={()=>deleteDoc(doc(db,"servicios",s.id))} className="text-red-300">✕</button>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* MODAL DE PRECIOS + GLOSA */}
+      {/* MODAL DE COTIZACIÓN */}
       {reservaParaCotizar && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[3rem] p-10 max-w-md w-full shadow-2xl">
