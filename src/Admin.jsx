@@ -3,29 +3,42 @@ import { db } from './firebase';
 import { collection, doc, deleteDoc, onSnapshot, updateDoc, addDoc, query, orderBy } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; 
+import Calendar from 'react-calendar'; // Nuevo: Para bloquear días
+import 'react-calendar/dist/Calendar.css'; // Estilos del calendario
 
 function Admin({ volver }) {
   const [reservas, setReservas] = useState([]);
-  const [busqueda, setBusqueda] = useState(""); // Nuevo: Para el buscador
+  const [busqueda, setBusqueda] = useState(""); 
   const [cargando, setCargando] = useState(true);
   const [reservaParaCotizar, setReservaParaCotizar] = useState(null);
   const [servicios, setServicios] = useState([]);
   const [nuevoSrv, setNuevoSrv] = useState("");
   const [precios, setPrecios] = useState({ pPersona: 0, transporte: 0, extras: 0, menu: '' });
 
+  // ESTADOS NUEVOS PARA BLOQUEO
+  const [fechaABloquear, setFechaABloquear] = useState(new Date());
+  const [diasBloqueados, setDiasBloqueados] = useState([]);
+
   useEffect(() => {
+    // Escuchar Reservas
     const qR = query(collection(db, "reservas"), orderBy("fechaRegistro", "desc"));
     const unsubR = onSnapshot(qR, (snap) => {
       setReservas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setCargando(false);
     });
+    // Escuchar Servicios
     const unsubS = onSnapshot(collection(db, "servicios"), (snap) => {
       setServicios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => { unsubR(); unsubS(); };
+    // Escuchar Bloqueos de Agenda
+    const unsubB = onSnapshot(collection(db, "bloqueos"), (snap) => {
+      setDiasBloqueados(snap.docs.map(d => ({ id: d.id, fecha: d.data().fecha })));
+    });
+
+    return () => { unsubR(); unsubS(); unsubB(); };
   }, []);
 
-  // --- NUEVO: Lógica de Estadísticas ---
+  // Estadísticas
   const stats = reservas.reduce((acc, res) => {
     acc.total++;
     if (res.estado === 'confirmado') acc.confirmados++;
@@ -33,11 +46,29 @@ function Admin({ volver }) {
     return acc;
   }, { total: 0, confirmados: 0, cotizados: 0 });
 
-  // --- NUEVO: Filtrado por búsqueda ---
+  // Filtrado
   const reservasFiltradas = reservas.filter(res => 
     res.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  // --- FUNCIONES DE BLOQUEO ---
+  const bloquearDia = async () => {
+    const fechaString = fechaABloquear.toISOString().split('T')[0];
+    if (diasBloqueados.some(d => d.fecha === fechaString)) return alert("Esta fecha ya está cerrada.");
+    
+    try {
+      await addDoc(collection(db, "bloqueos"), { fecha: fechaString });
+      alert("Agenda cerrada para el día " + fechaString);
+    } catch (e) { alert("Error al bloquear: " + e.message); }
+  };
+
+  const desbloquearDia = async (id) => {
+    if(window.confirm("¿Quieres volver a abrir esta fecha?")) {
+      await deleteDoc(doc(db, "bloqueos", id));
+    }
+  };
+
+  // --- GESTIÓN DE ESTADOS Y EMAIL ---
   const actualizarEstado = async (id, nuevoEstado) => {
     try { await updateDoc(doc(db, "reservas", id), { estado: nuevoEstado }); } catch (e) { console.error(e); }
   };
@@ -100,13 +131,13 @@ function Admin({ volver }) {
 
   return (
     <div className="min-h-screen bg-[#fcf8f0] p-6 text-[#4a3f35]">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <header className="flex justify-between items-center mb-10">
           <h1 className="text-4xl font-serif text-[#c1a57d]">Panel Rosa Pastel</h1>
           <button onClick={volver} className="text-xs font-bold uppercase text-[#c4b198] border-b border-[#c4b198]">Cerrar Sesión</button>
         </header>
 
-        {/* DASHBOARD DE STATS */}
+        {/* STATS */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           <div className="bg-white p-4 rounded-3xl border border-[#efe4d5] text-center">
             <p className="text-[10px] font-bold text-[#c4b198] uppercase">Recibidos</p>
@@ -122,55 +153,88 @@ function Admin({ volver }) {
           </div>
         </div>
 
-        {/* BUSCADOR */}
-        <div className="mb-6">
-          <input 
-            type="text" 
-            placeholder="🔍 Buscar cliente por nombre..." 
-            className="w-full p-4 bg-white rounded-2xl border border-[#efe4d5] outline-none focus:ring-2 focus:ring-[#c1a57d] transition-all"
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-        </div>
-
-        {/* LISTADO FILTRADO */}
-        <div className="space-y-3 mb-10">
-          {reservasFiltradas.map((res) => (
-            <div key={res.id} className="bg-white p-4 rounded-[1.8rem] border border-[#efe4d5] flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
-              <div className="flex-1 text-center md:text-left">
-                <div className="flex items-center justify-center md:justify-start gap-2">
-                  <h2 className="text-lg font-bold">{res.nombre}</h2>
-                  <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold uppercase ${res.estado === 'confirmado' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                    {res.estado || 'pendiente'}
-                  </span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (OCUPA 2/3) */}
+          <div className="lg:col-span-2 space-y-4">
+            <input 
+              type="text" 
+              placeholder="🔍 Buscar cliente por nombre..." 
+              className="w-full p-4 bg-white rounded-2xl border border-[#efe4d5] outline-none shadow-sm"
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            <div className="space-y-3">
+              {reservasFiltradas.map((res) => (
+                <div key={res.id} className="bg-white p-4 rounded-[1.8rem] border border-[#efe4d5] flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm hover:scale-[1.01] transition-transform">
+                  <div className="flex-1 text-center md:text-left">
+                    <div className="flex items-center justify-center md:justify-start gap-2">
+                      <h2 className="text-lg font-bold">{res.nombre}</h2>
+                      <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold uppercase ${res.estado === 'confirmado' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                        {res.estado || 'pendiente'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[#c4b198] font-bold uppercase">{res.fecha} • {res.invitados} pers • {res.tipoEvento}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => {setReservaParaCotizar(res); setPrecios({...precios, menu: res.detalles || ''})}} className="bg-[#fcf8f0] text-[#c1a57d] px-4 py-2 rounded-xl text-[9px] font-bold uppercase">1. Cotizar</button>
+                    {res.estado === 'cotizado' && <button onClick={() => enviarEmailManual(res)} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[9px] font-bold uppercase">2. Gmail</button>}
+                    {res.estado === 'cotizado' && <button onClick={() => actualizarEstado(res.id, 'confirmado')} className="bg-green-500 text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase">3. Aceptar</button>}
+                    <button onClick={async () => { if(window.confirm("¿Eliminar?")) await deleteDoc(doc(db, "reservas", res.id)); }} className="p-2 text-red-200">🗑️</button>
+                  </div>
                 </div>
-                <p className="text-[10px] text-[#c4b198] font-bold uppercase">{res.fecha} • {res.invitados} pers • {res.tipoEvento}</p>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="flex gap-2">
-                <button onClick={() => {setReservaParaCotizar(res); setPrecios({...precios, menu: res.detalles || ''})}} className="bg-[#fcf8f0] text-[#c1a57d] px-4 py-2 rounded-xl text-[9px] font-bold uppercase">1. Cotizar</button>
-                {res.estado === 'cotizado' && <button onClick={() => enviarEmailManual(res)} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[9px] font-bold uppercase">2. Gmail</button>}
-                {res.estado === 'cotizado' && <button onClick={() => actualizarEstado(res.id, 'confirmado')} className="bg-green-500 text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase">3. Aceptar</button>}
-                <button onClick={async () => { if(window.confirm("¿Eliminar?")) await deleteDoc(doc(db, "reservas", res.id)); }} className="p-2 text-red-200">🗑️</button>
+          {/* COLUMNA DERECHA: CONFIGURACIONES (OCUPA 1/3) */}
+          <div className="space-y-6">
+            
+            {/* CIERRE DE AGENDA */}
+            <div className="bg-white rounded-[2.5rem] p-6 border border-[#efe4d5] shadow-sm">
+              <h3 className="text-xl font-serif text-[#c1a57d] mb-4 text-center">Cerrar Agenda</h3>
+              <div className="flex flex-col items-center gap-4">
+                <Calendar 
+                  onChange={setFechaABloquear} 
+                  value={fechaABloquear}
+                  minDate={new Date()}
+                  className="rounded-xl border-none p-2 bg-[#fcf8f0]"
+                />
+                <button 
+                  onClick={bloquearDia}
+                  className="w-full py-3 bg-red-400 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-500 transition-colors"
+                >
+                  Cerrar esta fecha
+                </button>
+              </div>
+              <div className="mt-6">
+                <p className="text-[9px] font-bold text-[#c4b198] uppercase mb-2">Fechas Cerradas:</p>
+                <div className="flex flex-wrap gap-2">
+                  {diasBloqueados.map(d => (
+                    <div key={d.id} className="bg-red-50 text-red-500 px-3 py-1 rounded-full text-[9px] font-bold flex items-center gap-2 border border-red-100">
+                      {d.fecha} <button onClick={() => desbloquearDia(d.id)} className="font-bold">✕</button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          ))}
-          {reservasFiltradas.length === 0 && <p className="text-center text-[#c4b198] italic text-sm py-10">No se encontraron clientes con ese nombre...</p>}
-        </div>
 
-        {/* GESTIÓN DE SERVICIOS */}
-        <div className="bg-white rounded-[2.5rem] p-8 border border-[#efe4d5]">
-          <h3 className="text-xl font-serif text-[#c1a57d] mb-4">Servicios Disponibles</h3>
-          <div className="flex gap-2 mb-4">
-            <input value={nuevoSrv} onChange={(e)=>setNuevoSrv(e.target.value)} placeholder="Ej: Cena Gala" className="flex-1 p-3 bg-[#fcf8f0] rounded-xl outline-none text-sm" />
-            <button onClick={async () => { if(nuevoSrv) { await addDoc(collection(db, "servicios"), { nombre: nuevoSrv }); setNuevoSrv(""); } }} className="bg-[#c1a57d] text-white px-6 rounded-xl font-bold text-xs uppercase">Añadir</button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {servicios.map(s => (
-              <div key={s.id} className="bg-[#fcf8f0] px-3 py-1.5 rounded-full flex items-center gap-2 border border-[#efe4d5]">
-                <span className="text-[11px] font-bold">{s.nombre}</span>
-                <button onClick={()=>deleteDoc(doc(db,"servicios",s.id))} className="text-red-300">✕</button>
+            {/* GESTIÓN DE SERVICIOS */}
+            <div className="bg-white rounded-[2.5rem] p-8 border border-[#efe4d5] shadow-sm">
+              <h3 className="text-xl font-serif text-[#c1a57d] mb-4">Servicios</h3>
+              <div className="flex gap-2 mb-4">
+                <input value={nuevoSrv} onChange={(e)=>setNuevoSrv(e.target.value)} placeholder="Ej: Cena Gala" className="flex-1 p-2 bg-[#fcf8f0] rounded-lg outline-none text-xs" />
+                <button onClick={async () => { if(nuevoSrv) { await addDoc(collection(db, "servicios"), { nombre: nuevoSrv }); setNuevoSrv(""); } }} className="bg-[#c1a57d] text-white px-4 rounded-lg font-bold text-[10px] uppercase">Ok</button>
               </div>
-            ))}
+              <div className="flex flex-wrap gap-1">
+                {servicios.map(s => (
+                  <div key={s.id} className="bg-[#fcf8f0] px-2 py-1 rounded-full flex items-center gap-2 border border-[#efe4d5]">
+                    <span className="text-[10px] font-bold text-[#4a3f35]">{s.nombre}</span>
+                    <button onClick={()=>deleteDoc(doc(db,"servicios",s.id))} className="text-red-300 text-[10px]">✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

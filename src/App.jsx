@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from './firebase'; 
-import { collection, addDoc, query, getDocs } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query } from 'firebase/firestore';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import Admin from './Admin';
@@ -9,7 +9,8 @@ import emailjs from '@emailjs/browser';
 function App() {
   const [vista, setVista] = useState('cliente');
   const [enviando, setEnviando] = useState(false);
-  const [servicios, setServicios] = useState([]); // Estado para servicios dinámicos
+  const [servicios, setServicios] = useState([]);
+  const [diasCerrados, setDiasCerrados] = useState([]); // Nuevo: Estado para días bloqueados
   const [reserva, setReserva] = useState({
     nombre: '', 
     rut: '',
@@ -30,21 +31,24 @@ function App() {
   };
 
   useEffect(() => {
+    // 1. Detección de URL para Admin
     const queryParams = new URLSearchParams(window.location.search);
     if (queryParams.has('admin')) entrarAdmin();
 
-    // CARGAR SERVICIOS DESDE FIREBASE
-    const obtenerServicios = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "servicios"));
-        const lista = querySnapshot.docs.map(doc => doc.data().nombre);
-        setServicios(lista);
-        if (lista.length > 0) setReserva(prev => ({ ...prev, tipoEvento: lista[0] }));
-      } catch (error) {
-        console.error("Error cargando servicios:", error);
-      }
-    };
-    obtenerServicios();
+    // 2. Escuchar SERVICIOS en tiempo real
+    const unsubServicios = onSnapshot(collection(db, "servicios"), (snap) => {
+      const lista = snap.docs.map(doc => doc.data().nombre);
+      setServicios(lista);
+      if (lista.length > 0) setReserva(prev => ({ ...prev, tipoEvento: lista[0] }));
+    });
+
+    // 3. Escuchar BLOQUEOS (Días cerrados) en tiempo real
+    const unsubBloqueos = onSnapshot(collection(db, "bloqueos"), (snap) => {
+      const fechas = snap.docs.map(doc => doc.data().fecha);
+      setDiasCerrados(fechas);
+    });
+
+    return () => { unsubServicios(); unsubBloqueos(); };
   }, []);
 
   const handleChange = (e) => setReserva({ ...reserva, [e.target.name]: e.target.value });
@@ -55,14 +59,12 @@ function App() {
     setEnviando(true);
 
     try {
-      // Guardar en Firebase
       await addDoc(collection(db, "reservas"), {
         ...reserva,
         fechaRegistro: new Date().toLocaleString(),
         estado: 'pendiente'
       });
 
-      // EmailJS
       const serviceID = 'service_skm23ep';
       const templateID = 'template_vhlomqs';
       const publicKey = '56AEmrh5uSxllA5ot';
@@ -79,7 +81,6 @@ function App() {
 
   if (vista === 'admin') return <Admin volver={() => setVista('cliente')} />;
 
-  // --- Busca el final de tu App.jsx y reemplaza el return por este ---
   return (
     <div className="min-h-screen bg-[#fcf8f0] flex flex-col items-center py-12 px-4 text-[#4a3f35]">
       <header className="mb-12 text-center">
@@ -93,8 +94,7 @@ function App() {
         <h2 className="text-3xl font-serif text-[#c1a57d] mb-12 text-center italic">Cotiza tu próximo evento</h2>
         
         <form onSubmit={manejarReserva} className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-          {/* ... Todo tu formulario igual ... */}
-          {/* (Asegúrate de mantener los inputs de nombre, rut, email, etc.) */}
+          
           <div className="space-y-6">
             <h3 className="text-[#c4b198] text-[10px] font-bold uppercase tracking-widest border-b border-[#fcf8f0] pb-2">Datos de Contacto</h3>
             <input type="text" name="nombre" value={reserva.nombre} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Nombre Completo"/>
@@ -106,27 +106,32 @@ function App() {
           <div className="space-y-6">
             <h3 className="text-[#c4b198] text-[10px] font-bold uppercase tracking-widest border-b border-[#fcf8f0] pb-2">Fecha y Servicio</h3>
             <div className="flex flex-col items-center py-4 bg-[#fcf8f0] rounded-[2.5rem] border border-[#efe4d5]">
-              <Calendar onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})} minDate={new Date()} />
+              <Calendar 
+                onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})} 
+                minDate={new Date()} 
+                // AQUÍ SE BLOQUEAN LAS FECHAS:
+                tileDisabled={({date}) => diasCerrados.includes(date.toISOString().split('T')[0])}
+              />
+              {reserva.fecha && <p className="mt-2 text-[10px] font-bold text-[#c1a57d]">FECHA: {reserva.fecha}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
                <input type="number" name="invitados" value={reserva.invitados} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" />
-               <select name="tipoEvento" value={reserva.tipoEvento} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none">
+               <select name="tipoEvento" value={reserva.tipoEvento} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none text-sm">
                  {servicios.map(s => <option key={s} value={s}>{s}</option>)}
                </select>
             </div>
           </div>
 
           <div className="md:col-span-2 space-y-4">
-             <input type="text" name="direccion" value={reserva.direccion} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Dirección"/>
-             <textarea name="detalles" value={reserva.detalles} rows="2" onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Detalles..."></textarea>
+             <input type="text" name="direccion" value={reserva.direccion} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Dirección del Evento"/>
+             <textarea name="detalles" value={reserva.detalles} rows="2" onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Detalles o requerimientos especiales..."></textarea>
           </div>
 
-          <button type="submit" disabled={enviando} className="md:col-span-2 py-5 bg-[#c1a57d] text-white font-bold rounded-2xl uppercase tracking-widest">
+          <button type="submit" disabled={enviando} className="md:col-span-2 py-5 bg-[#c1a57d] text-white font-bold rounded-2xl uppercase tracking-widest hover:bg-[#a68d66] transition-all shadow-lg shadow-[#c1a57d]/20">
             {enviando ? 'Enviando...' : 'Consultar Disponibilidad'}
           </button>
         </form>
       </main>
-      {/* QUITAMOS EL FOOTER CON EL BOTÓN */}
     </div>
   );
 }
