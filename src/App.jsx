@@ -1,136 +1,74 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
 import { db } from './firebase'; 
-import { collection, addDoc, onSnapshot, query } from 'firebase/firestore';
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { Routes, Route, Link } from 'react-router-dom';
 import Admin from './Admin';
-import emailjs from '@emailjs/browser';
+import DetalleServicio from './DetalleServicio';
+
+function Home({ servicios }) {
+  return (
+    <div className="flex flex-col items-center">
+      <section className="relative w-full h-[60vh] rounded-[3rem] overflow-hidden mb-16 border-4 border-[#efe4d5] shadow-lg">
+        <img src="img/fondo.png" alt="Rosa Pastel" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20 flex flex-col items-center justify-center text-center p-6">
+          <h1 className="text-6xl md:text-8xl font-serif text-[#c1a57d] mb-4 tracking-tighter">Rosa Pastel</h1>
+          <p className="text-[#fcf8f0] uppercase tracking-[0.4em] text-xs font-bold mb-6">Banquetería & Eventos Temuco</p>
+        </div>
+      </section>
+
+      <section className="w-full max-w-6xl mb-20 px-4">
+        <h3 className="text-[#c4b198] text-[10px] font-bold uppercase tracking-widest border-b border-[#efe4d5] pb-3 mb-10 text-center">Nuestros Servicios</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {servicios.map((srv) => (
+            <div key={srv.id} className="bg-white p-6 rounded-[2.5rem] border border-[#efe4d5] shadow-sm flex flex-col items-center text-center">
+              <img src={srv.img ? `/img/${srv.img}` : '/logo.png'} alt={srv.nombre} className="w-full h-48 object-cover rounded-3xl mb-6 border border-[#efe4d5]" />
+              <h4 className="text-2xl font-serif text-[#c1a57d] mb-3">{srv.nombre}</h4>
+              <p className="text-sm text-[#4a3f35] flex-1 mb-6">{srv.desc || 'Servicio exclusivo de Rosa Pastel.'}</p>
+              <Link to={`/servicio/${srv.nombre}`} className="w-full py-4 bg-[#fcf8f0] text-[#c1a57d] font-bold rounded-2xl uppercase text-[10px] tracking-widest border border-[#efe4d5]">
+                Ver Más Info
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
 
 function App() {
   const [vista, setVista] = useState('cliente');
-  const [enviando, setEnviando] = useState(false);
   const [servicios, setServicios] = useState([]);
-  const [diasCerrados, setDiasCerrados] = useState([]); // Nuevo: Estado para días bloqueados
-  const [reserva, setReserva] = useState({
-    nombre: '', 
-    rut: '',
-    email: '',
-    telefono: '', 
-    fecha: '', 
-    hora: '12:00',
-    invitados: 10,
-    tipoEvento: '', 
-    direccion: '', 
-    detalles: ''
-  });
-
-  const entrarAdmin = () => {
-    const clave = prompt("Introduce la clave de administradora:");
-    if (clave === "rosapastel2026") setVista('admin');
-    else alert("Clave incorrecta");
-  };
+  const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    // 1. Detección de URL para Admin
     const queryParams = new URLSearchParams(window.location.search);
-    if (queryParams.has('admin')) entrarAdmin();
+    if (queryParams.has('admin')) {
+      const clave = prompt("Introduce la clave:");
+      if (clave === "rosapastel2026") setVista('admin');
+    }
 
-    // 2. Escuchar SERVICIOS en tiempo real
-    const unsubServicios = onSnapshot(collection(db, "servicios"), (snap) => {
-      const lista = snap.docs.map(doc => doc.data().nombre);
-      setServicios(lista);
-      if (lista.length > 0) setReserva(prev => ({ ...prev, tipoEvento: lista[0] }));
+    const unsub = onSnapshot(collection(db, "servicios"), (snap) => {
+      setServicios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCargando(false);
     });
-
-    // 3. Escuchar BLOQUEOS (Días cerrados) en tiempo real
-    const unsubBloqueos = onSnapshot(collection(db, "bloqueos"), (snap) => {
-      const fechas = snap.docs.map(doc => doc.data().fecha);
-      setDiasCerrados(fechas);
-    });
-
-    return () => { unsubServicios(); unsubBloqueos(); };
+    return () => unsub();
   }, []);
 
-  const handleChange = (e) => setReserva({ ...reserva, [e.target.name]: e.target.value });
+  if (cargando) return <div className="min-h-screen flex items-center justify-center bg-[#fcf8f0]">Cargando...</div>;
 
-  const manejarReserva = async (e) => {
-    e.preventDefault();
-    if (!reserva.fecha) return alert("Por favor selecciona una fecha en el calendario");
-    setEnviando(true);
-
-    try {
-      await addDoc(collection(db, "reservas"), {
-        ...reserva,
-        fechaRegistro: new Date().toLocaleString(),
-        estado: 'pendiente'
-      });
-
-      const serviceID = 'service_skm23ep';
-      const templateID = 'template_vhlomqs';
-      const publicKey = '56AEmrh5uSxllA5ot';
-      await emailjs.send(serviceID, templateID, reserva, publicKey);
-
-      alert("¡Solicitud enviada! Nos contactaremos pronto.");
-      setReserva({
-        nombre: '', rut: '', email: '', telefono: '', fecha: '', 
-        hora: '12:00', invitados: 10, tipoEvento: servicios[0] || '', 
-        direccion: '', detalles: ''
-      });
-    } catch (err) { alert("Error: " + err.message); } finally { setEnviando(false); }
-  };
-
-  if (vista === 'admin') return <Admin volver={() => setVista('cliente')} />;
+  if (vista === 'admin') return <Admin volver={() => { setVista('cliente'); window.history.replaceState({}, '', '/'); }} />;
 
   return (
-    <div className="min-h-screen bg-[#fcf8f0] flex flex-col items-center py-12 px-4 text-[#4a3f35]">
-      <header className="mb-12 text-center">
-        <img src="/logo.png" alt="Logo" className="w-32 h-32 rounded-full mx-auto mb-4 border-4 border-[#efe4d5] object-cover shadow-sm" />
-        <h1 className="text-7xl font-serif text-[#c1a57d] mb-2 tracking-tighter">Rosa Pastel</h1>
-        <div className="h-1 w-20 bg-[#c4b198] mx-auto mb-2"></div>
-        <p className="text-[#c4b198] uppercase tracking-[0.3em] text-[10px] font-bold">Banquetería & Eventos Temuco</p>
+    <div className="min-h-screen bg-[#fcf8f0] flex flex-col items-center py-10 px-4 text-[#4a3f35]">
+      <header className="mb-10 text-center flex flex-col items-center">
+        <Link to="/"><img src="/logo.png" alt="Logo" className="w-20 h-20 rounded-full" /></Link>
+        <h1 className="text-xl font-serif text-[#c1a57d]">Rosa Pastel</h1>
       </header>
-
-      <main className="bg-white shadow-sm rounded-[3rem] p-8 md:p-16 max-w-4xl w-full border border-[#efe4d5]">
-        <h2 className="text-3xl font-serif text-[#c1a57d] mb-12 text-center italic">Cotiza tu próximo evento</h2>
-        
-        <form onSubmit={manejarReserva} className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-          
-          <div className="space-y-6">
-            <h3 className="text-[#c4b198] text-[10px] font-bold uppercase tracking-widest border-b border-[#fcf8f0] pb-2">Datos de Contacto</h3>
-            <input type="text" name="nombre" value={reserva.nombre} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Nombre Completo"/>
-            <input type="text" name="rut" value={reserva.rut} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="RUT"/>
-            <input type="email" name="email" value={reserva.email} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="E-mail"/>
-            <input type="tel" name="telefono" value={reserva.telefono} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="WhatsApp"/>
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="text-[#c4b198] text-[10px] font-bold uppercase tracking-widest border-b border-[#fcf8f0] pb-2">Fecha y Servicio</h3>
-            <div className="flex flex-col items-center py-4 bg-[#fcf8f0] rounded-[2.5rem] border border-[#efe4d5]">
-              <Calendar 
-                onChange={(val) => setReserva({...reserva, fecha: val.toISOString().split('T')[0]})} 
-                minDate={new Date()} 
-                // AQUÍ SE BLOQUEAN LAS FECHAS:
-                tileDisabled={({date}) => diasCerrados.includes(date.toISOString().split('T')[0])}
-              />
-              {reserva.fecha && <p className="mt-2 text-[10px] font-bold text-[#c1a57d]">FECHA: {reserva.fecha}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-               <input type="number" name="invitados" value={reserva.invitados} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" />
-               <select name="tipoEvento" value={reserva.tipoEvento} onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none text-sm">
-                 {servicios.map(s => <option key={s} value={s}>{s}</option>)}
-               </select>
-            </div>
-          </div>
-
-          <div className="md:col-span-2 space-y-4">
-             <input type="text" name="direccion" value={reserva.direccion} onChange={handleChange} required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Dirección del Evento"/>
-             <textarea name="detalles" value={reserva.detalles} rows="2" onChange={handleChange} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" placeholder="Detalles o requerimientos especiales..."></textarea>
-          </div>
-
-          <button type="submit" disabled={enviando} className="md:col-span-2 py-5 bg-[#c1a57d] text-white font-bold rounded-2xl uppercase tracking-widest hover:bg-[#a68d66] transition-all shadow-lg shadow-[#c1a57d]/20">
-            {enviando ? 'Enviando...' : 'Consultar Disponibilidad'}
-          </button>
-        </form>
+      <main className="max-w-7xl w-full">
+        <Routes>
+          <Route path="/" element={<Home servicios={servicios} />} />
+          <Route path="/servicio/:nombreServicio" element={<DetalleServicio servicios={servicios} />} />
+        </Routes>
       </main>
     </div>
   );
