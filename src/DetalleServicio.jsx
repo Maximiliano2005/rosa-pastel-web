@@ -17,7 +17,7 @@ function DetalleServicio({ servicios }) {
 
   const srvData = servicios.find(s => s.nombre === nombreServicio) || { items: [], img: '', desc: '' };
   
-  // CAMBIO CLAVE: Ahora el estado inicial del menú seleccionado siempre empieza vacío []
+  // El menú seleccionado siempre empieza vacío []
   const [itemsSeleccionados, setItemsSeleccionados] = useState([]);
   const [reserva, setReserva] = useState({
     nombre: '', email: '', telefono: '', 
@@ -32,7 +32,7 @@ function DetalleServicio({ servicios }) {
     // 2. Ocultar el formulario (Paso 2) para que solo vea el menú
     setMostrarForm(false);
     
-    // 3. CAMBIO CLAVE: Al cambiar de servicio o entrar, el menú se resetea a VACÍO
+    // 3. Al cambiar de servicio o entrar, el menú se resetea a VACÍO
     setItemsSeleccionados([]);
     
     const unsub = onSnapshot(collection(db, "bloqueos"), (snap) => {
@@ -66,11 +66,26 @@ function DetalleServicio({ servicios }) {
     };
 
     try {
-      await addDoc(collection(db, "reservas"), dataFinal);
-      await emailjs.send('service_skm23ep', 'template_vhlomqs', dataFinal, '56AEmrh5uSxllA5ot');
+      // 1. Guardamos la cotización y capturamos la referencia del nuevo documento en Firestore
+      const docRef = await addDoc(collection(db, "reservas"), dataFinal);
+      
+      // 2. Añadimos el ID generado por Firebase al objeto final para EmailJS
+      const dataParaEmail = {
+        ...dataFinal,
+        reserva_id: docRef.id // <-- Variable mágica para usar en la plantilla
+      };
+
+      // 3. Enviamos los datos con EmailJS incluyendo la variable reserva_id
+      await emailjs.send('service_skm23ep', 'template_vhlomqs', dataParaEmail, '56AEmrh5uSxllA5ot');
+      
       alert("¡Solicitud enviada con éxito!");
       navigate('/');
-    } catch (err) { alert("Error al enviar"); } finally { setEnviando(false); }
+    } catch (err) { 
+      alert("Error al enviar"); 
+      console.error(err);
+    } finally { 
+      setEnviando(false); 
+    }
   };
 
   return (
