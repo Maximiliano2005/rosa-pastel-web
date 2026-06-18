@@ -30,7 +30,7 @@ function Home({ servicios }) {
                 <h4 className="text-2xl font-serif text-[#c1a57d] mb-3">{srv.nombre}</h4>
                 <p className="text-sm text-[#4a3f35] flex-1 mb-6">{srv.desc || 'Servicio exclusivo de Rosa Pastel.'}</p>
                 <Link to={`/servicio/${srv.nombre}`} className="w-full py-4 bg-[#fcf8f0] text-[#c1a57d] font-bold rounded-2xl uppercase text-[10px] tracking-widest border border-[#efe4d5]">
-                  Ver Más Info
+                  Cotiza Aqui!
                 </Link>
               </div>
             );
