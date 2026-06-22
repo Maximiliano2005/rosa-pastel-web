@@ -28,7 +28,7 @@ function Home({ servicios }) {
               <div key={srv.id} className="bg-white p-6 rounded-[2.5rem] border border-[#efe4d5] shadow-sm flex flex-col items-center text-center">
                 <img src={imagenUrl} alt={srv.nombre} className="w-full h-48 object-cover rounded-3xl mb-6 border border-[#efe4d5]" />
                 <h4 className="text-2xl font-serif text-[#c1a57d] mb-3">{srv.nombre}</h4>
-                <p className="text-sm text-[#4a3f35] flex-1 mb-6">{srv.desc || 'Servicio exclusivo de Rosa Pastel.'}</p>
+                <p className="text-sm text-[#4a3f35] flex-1 mb-6 whitespace-pre-wrap text-left">{srv.desc || 'Servicio exclusivo de Rosa Pastel.'}</p>
                 <Link to={`/servicio/${srv.nombre}`} className="w-full py-4 bg-[#fcf8f0] text-[#c1a57d] font-bold rounded-2xl uppercase text-[10px] tracking-widest border border-[#efe4d5]">
                   Cotiza Aqui!
                 </Link>
