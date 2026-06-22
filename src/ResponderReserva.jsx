@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom'; // <-- CAMBIO AQUÍ: Ahora usamos useParams
+import { useParams, useNavigate } from 'react-router-dom';
 import { db } from './firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
 
 function ResponderReserva() {
-  // <-- CAMBIO AQUÍ: Capturamos 'estado' e 'id' directamente de la URL
   const { estado, id } = useParams(); 
   const navigate = useNavigate();
   
   const idReserva = id;
-  const estadoInicial = estado; // 'aceptado' o 'rechazado'
+  const estadoInicial = estado; 
 
   const [reserva, setReserva] = useState(null);
   const [comentario, setComentario] = useState('');
@@ -47,30 +46,33 @@ function ResponderReserva() {
     const docRef = doc(db, "reservas", idReserva);
 
     try {
-      // 1. Actualizar Firebase con el nuevo estado y el comentario del cliente
+      // 1. Actualizar Firebase
       await updateDoc(docRef, {
         estado: nuevoEstado,
         comentarioCliente: comentario,
         fechaRespuesta: new Date().toLocaleString()
       });
 
-      // 2. Enviar correos de notificación mediante EmailJS
-      // ID del Servicio, ID de la Plantilla de respuesta, Datos, Public Key
+      // 2. Creamos el mensaje dinámico para el correo
+      const textoResolucion = nuevoEstado === 'confirmado' 
+        ? "Nuestro equipo se pondrá en contacto contigo a la brevedad para coordinar los detalles del contrato y el abono."
+        : "Hemos registrado tu respuesta. La cotización ha sido declinada y la fecha ha sido liberada. ¡Gracias por considerarnos!";
+
       const infoNotificacion = {
         cliente_nombre: reserva.nombre,
         cliente_email: reserva.email,
         tipo_evento: reserva.tipoEvento,
         fecha_evento: reserva.fecha,
-        estado_final: nuevoEstado === 'confirmado' ? 'ACEPTADA y Agendada' : 'RECHAZADA',
+        estado_final: nuevoEstado === 'confirmado' ? 'ACEPTADA Y AGENDADA ✅' : 'RECHAZADA ❌',
+        mensaje_resolucion: textoResolucion,
         comentario_cliente: comentario || "Sin comentarios adicionales."
       };
 
-      // Correo para tu tía notificando la decisión
-      await emailjs.send('service_skm23ep', 'TU_PLANTILLA_AVISO_TIA', infoNotificacion, '56AEmrh5uSxllA5ot');
+      // 3. ENVIAMOS UN SOLO CORREO (Le llega al cliente y a tu tía por copia oculta)
+      // !!! RECUERDA CAMBIAR 'ID_DE_TU_PLANTILLA_2' POR EL TEMPLATE ID REAL !!!
+      await emailjs.send('service_skm23ep', 'template_ik0mqzs', infoNotificacion, '56AEmrh5uSxllA5ot');
 
       if (nuevoEstado === 'confirmado') {
-        // Opcional: Correo de confirmación final para el cliente indicando que ya se agendó
-        await emailjs.send('service_skm23ep', 'TU_PLANTILLA_CONFIRMACION_CLIENTE', infoNotificacion, '56AEmrh5uSxllA5ot');
         alert("¡Excelente! Tu reserva ha sido confirmada y agendada automáticamente.");
       } else {
         alert("Gracias por informarnos. La cotización ha sido cancelada.");
