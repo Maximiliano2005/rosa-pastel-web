@@ -54,9 +54,24 @@ function App() {
     }
 
     const unsub = onSnapshot(collection(db, "servicios"), (snap) => {
-      setServicios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      // 1. Obtenemos todos los servicios
+      let listaServicios = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // 2. ORDENAMOS: Todo lo que diga "promo" o "promoción" se va al inicio
+      listaServicios.sort((a, b) => {
+        const aEsPromo = a.nombre.toLowerCase().includes('promo');
+        const bEsPromo = b.nombre.toLowerCase().includes('promo');
+        
+        if (aEsPromo && !bEsPromo) return -1; // A sube al principio
+        if (!aEsPromo && bEsPromo) return 1;  // B sube al principio
+        return 0; // Si ambos son promo o ninguno lo es, se quedan donde están
+      });
+
+      // 3. Guardamos la lista ya ordenada
+      setServicios(listaServicios);
       setCargando(false);
     });
+    
     return () => unsub();
   }, []);
 
