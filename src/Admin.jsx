@@ -62,9 +62,26 @@ function Admin({ volver }) {
 
   const actualizarEstado = async (id, estado) => await updateDoc(doc(db, "reservas", id), { estado });
 
+  // --- FUNCIÓN ACTUALIZADA: CORREO MANUAL CON LINKS Y OPCIÓN A NEGOCIAR ---
   const enviarEmailManual = (res) => {
-    const cuerpo = encodeURIComponent(`Hola ${res.nombre},\n\nAdjuntamos la cotización. Quedamos atentos,\nRosa Pastel.`);
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${res.email}&su=Cotizacion Rosa Pastel&body=${cuerpo}`, '_blank');
+    // Recuerda cambiar 'localhost:5173' por tu link real cuando publiques la web
+    const linkAceptar = `http://localhost:5173/responder-reserva?id=${res.id}&estado=aceptado`;
+    const linkRechazar = `http://localhost:5173/responder-reserva?id=${res.id}&estado=rechazado`;
+
+    const cuerpo = encodeURIComponent(
+      `Hola ${res.nombre},\n\n` +
+      `Adjuntamos la cotización formal correspondiente a tu evento. Quedamos atentos a tus comentarios,\n` +
+      `Rosa Pastel.\n\n` +
+      `----------------------------------------\n` +
+      `¿Qué te parece la propuesta? Selecciona una opción:\n\n` +
+      `👉 ACEPTAR Y AGENDAR EVENTO:\n${linkAceptar}\n\n` +
+      `❌ RECHAZAR PROPUESTA:\n${linkRechazar}\n\n` +
+      `----------------------------------------\n` +
+      `💬 ¿Necesitas hacer algún cambio o ajustar el presupuesto?\n` +
+      `Puedes responder directamente a este correo o contactarnos por WhatsApp para que lo revisemos juntos y armemos algo a tu medida.`
+    );
+
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${res.email}&su=Cotización Rosa Pastel&body=${cuerpo}`, '_blank');
   };
 
   const generarPDFOficial = (res, valores) => {
