@@ -15,13 +15,22 @@ function DetalleServicio({ servicios }) {
   // Control de pasos
   const [mostrarForm, setMostrarForm] = useState(false);
 
-  const srvData = servicios.find(s => s.nombre === nombreServicio) || { items: [], img: '', desc: '' };
+  // Traemos los datos del servicio (con valores por defecto por si acaso)
+  const srvData = servicios.find(s => s.nombre === nombreServicio) || { 
+    items: [], 
+    img: '', 
+    desc: '', 
+    minPersonas: 10, 
+    permiteEleccion: false 
+  };
   
   // El menú seleccionado siempre empieza vacío []
   const [itemsSeleccionados, setItemsSeleccionados] = useState([]);
+  
+  // AGREGAMOS "hora: ''" al estado inicial
   const [reserva, setReserva] = useState({
     nombre: '', email: '', telefono: '', 
-    fecha: '', invitados: '', direccion: '', detalles: '',
+    fecha: '', hora: '', invitados: '', direccion: '', detalles: '',
     tipoEvento: nombreServicio
   });
 
@@ -50,11 +59,25 @@ function DetalleServicio({ servicios }) {
   const enviarForm = async (e) => {
     e.preventDefault();
     if (!reserva.fecha) return alert("Por favor selecciona una fecha en el calendario");
+
+    // VALIDACIÓN: Revisar el mínimo de personas antes de enviar
+    const minRequerido = srvData.minPersonas || 1;
+    if (Number(reserva.invitados) < minRequerido) {
+      return alert(`Lo sentimos, el mínimo requerido para el servicio "${nombreServicio}" es de ${minRequerido} personas.`);
+    }
+
     setEnviando(true);
 
-    // Si no seleccionó nada, mandamos un aviso amigable o texto vacío
-    const itemsTexto = itemsSeleccionados.length > 0 
-      ? `• ${itemsSeleccionados.join('\n• ')}`
+    // LÓGICA DE MENÚ: Si es a elección, mandamos los marcados. Si es fijo, mandamos todos.
+    let itemsFinales = [];
+    if (srvData.permiteEleccion) {
+      itemsFinales = itemsSeleccionados;
+    } else {
+      itemsFinales = srvData.items || [];
+    }
+
+    const itemsTexto = itemsFinales.length > 0 
+      ? `• ${itemsFinales.join('\n• ')}`
       : 'Ninguno (A coordinar a medida)';
 
     const menuTexto = `\n\n--- MENÚ SELECCIONADO ---\n${itemsTexto}`;
@@ -66,16 +89,13 @@ function DetalleServicio({ servicios }) {
     };
 
     try {
-      // 1. Guardamos la cotización y capturamos la referencia del nuevo documento en Firestore
       const docRef = await addDoc(collection(db, "reservas"), dataFinal);
       
-      // 2. Añadimos el ID generado por Firebase al objeto final para EmailJS
       const dataParaEmail = {
         ...dataFinal,
-        reserva_id: docRef.id // <-- Variable mágica para usar en la plantilla
+        reserva_id: docRef.id 
       };
 
-      // 3. Enviamos los datos con EmailJS incluyendo la variable reserva_id
       await emailjs.send('service_skm23ep', 'template_vhlomqs', dataParaEmail, '56AEmrh5uSxllA5ot');
       
       alert("¡Solicitud enviada con éxito!");
@@ -100,21 +120,39 @@ function DetalleServicio({ servicios }) {
           <span className="text-[10px] font-bold text-[#c1a57d] uppercase tracking-[0.3em]">Paso 1</span>
           <h2 className="text-5xl font-serif text-[#c1a57d] mt-2 mb-4 uppercase">{nombreServicio}</h2>
           <div className="h-1 w-16 bg-[#efe4d5] mx-auto mb-6"></div>
-          <p className="text-sm text-[#4a3f35] max-w-xl mx-auto">Elige los productos que deseas incluir en tu banquetería.</p>
+          <p className="text-sm text-[#4a3f35] max-w-xl mx-auto">
+            {srvData.permiteEleccion ? "Elige los productos que deseas incluir en tu banquetería." : "Revisa el detalle de lo que incluye este servicio."}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start mb-10">
           <img src={srvData.img ? `/img/${srvData.img}` : '/logo.png'} alt={nombreServicio} className="rounded-[2.5rem] w-full h-80 object-cover shadow-md" />
           <div className="space-y-4">
-            <h3 className="text-xl font-serif text-[#c1a57d] italic mb-6">Arma tu Menú:</h3>
+            <h3 className="text-xl font-serif text-[#c1a57d] italic mb-6">
+              {srvData.permiteEleccion ? 'Arma tu Menú:' : 'El servicio incluye:'}
+            </h3>
+            
             <div className="grid grid-cols-1 gap-3">
               {srvData.items && srvData.items.length > 0 ? (
-                srvData.items.map((item, idx) => (
-                  <label key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${itemsSeleccionados.includes(item) ? 'bg-[#fcf8f0] border-[#c1a57d] shadow-sm opacity-100' : 'bg-white border-[#efe4d5] opacity-60 hover:opacity-90'}`}>
-                    <input type="checkbox" checked={itemsSeleccionados.includes(item)} onChange={() => handleCheckbox(item)} className="w-5 h-5 accent-[#c1a57d] cursor-pointer" />
-                    <span className="text-sm font-medium text-[#4a3f35]">{item}</span>
-                  </label>
-                ))
+                srvData.permiteEleccion ? (
+                  srvData.items.map((item, idx) => (
+                    <label key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${itemsSeleccionados.includes(item) ? 'bg-[#fcf8f0] border-[#c1a57d] shadow-sm opacity-100' : 'bg-white border-[#efe4d5] opacity-60 hover:opacity-90'}`}>
+                      <input type="checkbox" checked={itemsSeleccionados.includes(item)} onChange={() => handleCheckbox(item)} className="w-5 h-5 accent-[#c1a57d] cursor-pointer" />
+                      <span className="text-sm font-medium text-[#4a3f35]">{item}</span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="bg-[#fcf8f0] p-6 rounded-2xl border border-[#efe4d5]">
+                    <ul className="space-y-3">
+                      {srvData.items.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-3 text-sm font-medium text-[#4a3f35]">
+                          <span className="text-[#c1a57d] font-bold">✔</span> 
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
               ) : (
                 <p className="text-sm text-[#4a3f35] italic">Este servicio es a medida. Haz clic abajo para solicitar información.</p>
               )}
@@ -151,7 +189,33 @@ function DetalleServicio({ servicios }) {
               <input type="text" placeholder="Nombre completo" required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" onChange={e => setReserva({...reserva, nombre: e.target.value})} />
               <input type="email" placeholder="Correo electrónico" required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" onChange={e => setReserva({...reserva, email: e.target.value})} />
               <input type="tel" placeholder="WhatsApp" required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" onChange={e => setReserva({...reserva, telefono: e.target.value})} />
-              <input type="number" placeholder="N° de Invitados" required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" onChange={e => setReserva({...reserva, invitados: e.target.value})} />
+              
+              {/* BLOQUE DIVIDIDO: INVITADOS Y HORA */}
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <input 
+                    type="number" 
+                    placeholder={`Invitados`} 
+                    required 
+                    min={srvData.minPersonas || 1}
+                    className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" 
+                    onChange={e => setReserva({...reserva, invitados: e.target.value})} 
+                  />
+                  <p className="text-[10px] font-bold text-[#c4b198] ml-2 mt-1 uppercase">Mínimo: {srvData.minPersonas || 1}</p>
+                </div>
+                
+                {/* NUEVO CAMPO DE HORA */}
+                <div className="flex-1">
+                  <input 
+                    type="time" 
+                    required 
+                    className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none text-[#4a3f35]" 
+                    onChange={e => setReserva({...reserva, hora: e.target.value})} 
+                  />
+                  <p className="text-[10px] font-bold text-[#c4b198] ml-2 mt-1 uppercase">Hora de Inicio</p>
+                </div>
+              </div>
+
               <input type="text" placeholder="Dirección exacta del evento" required className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none border border-[#c1a57d]/20" onChange={e => setReserva({...reserva, direccion: e.target.value})} />
               <textarea placeholder="¿Algún requerimiento especial?" rows="3" className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none text-sm" onChange={e => setReserva({...reserva, detalles: e.target.value})}></textarea>
             </div>

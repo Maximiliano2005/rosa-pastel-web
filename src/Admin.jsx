@@ -25,7 +25,6 @@ function Admin({ volver }) {
   const [servicioEditando, setServicioEditando] = useState(null); 
   const [nuevoItem, setNuevoItem] = useState(""); 
 
-  // Añadimos 'direccion' al estado de precios para poder editarla antes del PDF
   const [precios, setPrecios] = useState({ pPersona: 0, transporte: 0, extras: 0, menu: '', direccion: '' });
 
   const [fechaABloquear, setFechaABloquear] = useState(new Date());
@@ -62,26 +61,41 @@ function Admin({ volver }) {
 
   const actualizarEstado = async (id, estado) => await updateDoc(doc(db, "reservas", id), { estado });
 
-  // --- FUNCIÓN ACTUALIZADA: CORREO MANUAL CON LINKS Y OPCIÓN A NEGOCIAR ---
   const enviarEmailManual = (res) => {
-    // Recuerda cambiar 'localhost:5173' por tu link real cuando publiques la web
-    const linkAceptar = `http://localhost:5173/responder-reserva?id=${res.id}&estado=aceptado`;
-    const linkRechazar = `http://localhost:5173/responder-reserva?id=${res.id}&estado=rechazado`;
+    const linkAceptar = `https://rosa-pastel-web.vercel.app/responder/aceptado/${res.id}`;
+    const linkRechazar = `https://rosa-pastel-web.vercel.app/responder/rechazado/${res.id}`;
 
     const cuerpo = encodeURIComponent(
       `Hola ${res.nombre},\n\n` +
       `Adjuntamos la cotización formal correspondiente a tu evento. Quedamos atentos a tus comentarios,\n` +
       `Rosa Pastel.\n\n` +
-      `----------------------------------------\n` +
-      `¿Qué te parece la propuesta? Selecciona una opción:\n\n` +
-      `👉 ACEPTAR Y AGENDAR EVENTO:\n${linkAceptar}\n\n` +
-      `❌ RECHAZAR PROPUESTA:\n${linkRechazar}\n\n` +
-      `----------------------------------------\n` +
+      `=========================================\n` +
+      `    ¿CÓMO RESPONDER A ESTA PROPUESTA?    \n` +
+      `=========================================\n\n` +
+      `Si revisaste el PDF y estás de acuerdo, presiona aquí para agendar automáticamente:\n` +
+      `🔹 ACEPTAR Y AGENDAR:\n${linkAceptar}\n\n` +
+      `Si por el contrario decides declinar la propuesta, presiona aquí:\n` +
+      `🔸 RECHAZAR PROPUESTA:\n${linkRechazar}\n\n` +
+      `-----------------------------------------\n` +
       `💬 ¿Necesitas hacer algún cambio o ajustar el presupuesto?\n` +
-      `Puedes responder directamente a este correo o contactarnos por WhatsApp para que lo revisemos juntos y armemos algo a tu medida.`
+      `Puedes responder directamente a este correo o contactarnos por WhatsApp para que lo revisemos juntos y lo adaptemos a tus necesidades.`
     );
 
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${res.email}&su=Cotización Rosa Pastel&body=${cuerpo}`, '_blank');
+  };
+
+  // --- FUNCIÓN AGREGADA PARA ABRIR WHATSAPP DIRECTO ---
+  const abrirWhatsAppCliente = (res) => {
+    let numLimpio = res.telefono ? res.telefono.replace(/\s+/g, '').replace('+', '') : '';
+    if (!numLimpio.startsWith('56') && numLimpio.length > 0) {
+      numLimpio = '56' + numLimpio;
+    }
+
+    const mensaje = encodeURIComponent(
+      `Hola ${res.nombre}, te contacto desde Rosa Pastel Banquetería por la cotización de tu evento (${res.tipoEvento}) solicitado para el día ${formatearFecha(res.fecha)}.`
+    );
+
+    window.open(`https://wa.me/${numLimpio}?text=${mensaje}`, '_blank');
   };
 
   const generarPDFOficial = (res, valores) => {
@@ -100,7 +114,6 @@ function Admin({ volver }) {
       docPDF.text(`Nombre: ${res.nombre}`, 20, 65);
       docPDF.text(`Evento: ${res.tipoEvento} | Fecha: ${formatearFecha(res.fecha)}`, 20, 71);
       
-      // USAMOS LA DIRECCIÓN QUE EDITÓ LA TÍA EN EL MODAL
       docPDF.text(`Dirección: ${valores.direccion || 'No especificada'}`, 20, 77); 
 
       docPDF.setFont("helvetica", "bold").text("EL SERVICIO INCLUYE:", 20, 89);
@@ -170,19 +183,33 @@ function Admin({ volver }) {
                 <div key={res.id} className="bg-white p-4 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
                   <div className="flex-1">
                     <h2 className="text-lg font-bold">{res.nombre} <span className="text-[8px] bg-gray-100 px-2 rounded-full uppercase">{res.estado}</span></h2>
-                    <p className="text-[10px] text-[#c4b198] font-bold uppercase">{formatearFecha(res.fecha)} • {res.invitados} pers • {res.tipoEvento}</p>
+                    
+                    {/* INFO EXTRA Y HORA AGREGADOS AQUÍ */}
+                    <p className="text-[10px] text-[#c4b198] font-bold uppercase">
+                      {formatearFecha(res.fecha)} a las {res.hora || '--:--'} hrs • {res.invitados} pers • {res.tipoEvento}
+                    </p>
+                    <p className="text-[10px] text-[#4a3f35]/60 mt-1">
+                      📍 {res.direccion} | ✉ {res.email} | 📞 {res.telefono}
+                    </p>
+
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap md:flex-nowrap gap-2">
+                    
+                    {/* BOTÓN DE WHATSAPP AGREGADO AQUÍ */}
+                    <button onClick={() => abrirWhatsAppCliente(res)} className="bg-green-50 text-green-600 px-3 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-green-600 hover:text-white transition-colors">
+                      💬 WhatsApp
+                    </button>
+
                     <button onClick={() => {
                       setReservaParaCotizar(res); 
                       setPrecios({
                         ...precios, 
                         menu: res.detalles || '', 
-                        direccion: res.direccion || '' // Cargamos la dirección si existe
+                        direccion: res.direccion || '' 
                       })
-                    }} className="bg-[#fcf8f0] text-[#c1a57d] px-4 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-[#c1a57d] hover:text-white transition-colors">1. Cotizar</button>
-                    {res.estado === 'cotizado' && <button onClick={() => enviarEmailManual(res)} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[9px] font-bold uppercase">2. Gmail</button>}
-                    {res.estado === 'cotizado' && <button onClick={() => actualizarEstado(res.id, 'confirmado')} className="bg-green-500 text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase">3. Aceptar</button>}
+                    }} className="bg-[#fcf8f0] text-[#c1a57d] px-3 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-[#c1a57d] hover:text-white transition-colors">1. Cotizar</button>
+                    {res.estado === 'cotizado' && <button onClick={() => enviarEmailManual(res)} className="bg-blue-50 text-blue-600 px-3 py-2 rounded-xl text-[9px] font-bold uppercase">2. Gmail</button>}
+                    {res.estado === 'cotizado' && <button onClick={() => actualizarEstado(res.id, 'confirmado')} className="bg-green-500 text-white px-3 py-2 rounded-xl text-[9px] font-bold uppercase">3. Aceptar</button>}
                     <button onClick={async () => { if(window.confirm("¿Eliminar?")) await deleteDoc(doc(db, "reservas", res.id)); }} className="p-2 text-red-200 hover:text-red-500">🗑️</button>
                   </div>
                 </div>
@@ -208,7 +235,19 @@ function Admin({ volver }) {
               
               <div className="flex gap-2 mb-4">
                 <input value={nuevoSrv} onChange={(e)=>setNuevoSrv(e.target.value)} placeholder="Ej: Coffee Break" className="flex-1 p-2 bg-[#fcf8f0] rounded-lg text-xs outline-none" />
-                <button onClick={async () => { if(nuevoSrv) { await addDoc(collection(db, "servicios"), { nombre: nuevoSrv, items: [], img: '', desc: '' }); setNuevoSrv(""); } }} className="bg-[#c1a57d] text-white px-4 rounded-lg font-bold text-[10px]">Ok</button>
+                <button onClick={async () => { 
+                  if(nuevoSrv) { 
+                    await addDoc(collection(db, "servicios"), { 
+                      nombre: nuevoSrv, 
+                      items: [], 
+                      img: '', 
+                      desc: '',
+                      minPersonas: 10,
+                      permiteEleccion: false
+                    }); 
+                    setNuevoSrv(""); 
+                  } 
+                }} className="bg-[#c1a57d] text-white px-4 rounded-lg font-bold text-[10px]">Ok</button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {servicios.map(s => (
@@ -223,7 +262,7 @@ function Admin({ volver }) {
         </div>
       </div>
 
-      {/* MODAL 1: COTIZAR (CON CAMPO DE DIRECCIÓN) */}
+      {/* MODAL 1: COTIZAR */}
       {reservaParaCotizar && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[3rem] p-8 max-w-lg w-full shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -234,7 +273,6 @@ function Admin({ volver }) {
                 <input type="number" placeholder="Transporte ($)" className="p-4 bg-[#fcf8f0] rounded-2xl outline-none" onChange={(e)=>setPrecios({...precios, transporte: e.target.value})} />
               </div>
               
-              {/* CAMPO DE DIRECCIÓN EDITABLE */}
               <label className="text-[10px] font-bold text-[#c1a57d] uppercase ml-2">Dirección (Aparecerá en Datos del Cliente):</label>
               <input type="text" value={precios.direccion} className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none text-sm" onChange={(e)=>setPrecios({...precios, direccion: e.target.value})} placeholder="Ej: Pasaje La Horqueta 551..."/>
 
@@ -266,16 +304,45 @@ function Admin({ volver }) {
                 <label className="text-[10px] text-[#c1a57d] font-bold uppercase mb-1 block">Descripción para la tarjeta</label>
                 <textarea id="inputDesc" rows="2" defaultValue={servicioEditando.desc || ""} placeholder="Breve descripción..." className="w-full p-2 bg-white rounded-lg text-xs outline-none border border-[#efe4d5]"></textarea>
               </div>
+
+              <div className="flex gap-4 items-center bg-white p-3 rounded-lg border border-[#efe4d5]">
+                <div className="flex-1">
+                  <label className="text-[10px] text-[#c1a57d] font-bold uppercase mb-1 block">Mínimo Personas</label>
+                  <input id="inputMinPersonas" type="number" min="1" defaultValue={servicioEditando.minPersonas || 10} className="w-full p-2 bg-[#fcf8f0] rounded-lg text-xs outline-none border border-[#efe4d5]" />
+                </div>
+                <div className="flex-1">
+                  <label className="flex flex-col items-center gap-1 text-[9px] text-[#c1a57d] font-bold uppercase cursor-pointer mt-1">
+                    <input id="inputMenuEleccion" type="checkbox" defaultChecked={servicioEditando.permiteEleccion || false} className="accent-[#c1a57d] w-4 h-4 cursor-pointer" />
+                    <span className="text-center">¿Menú a Elección?</span>
+                  </label>
+                </div>
+              </div>
+
               <button onClick={async () => {
                 const imgVal = document.getElementById('inputImg').value;
                 const descVal = document.getElementById('inputDesc').value;
-                await updateDoc(doc(db, "servicios", servicioEditando.id), { img: imgVal, desc: descVal });
-                setServicioEditando({...servicioEditando, img: imgVal, desc: descVal});
-                alert("Datos de presentación guardados");
-              }} className="w-full bg-[#c1a57d] text-white py-2 rounded-lg font-bold text-[10px] uppercase shadow-sm hover:bg-[#a68d66]">Guardar Foto y Texto</button>
+                const minVal = Number(document.getElementById('inputMinPersonas').value);
+                const eleccionVal = document.getElementById('inputMenuEleccion').checked;
+
+                await updateDoc(doc(db, "servicios", servicioEditando.id), { 
+                  img: imgVal, 
+                  desc: descVal,
+                  minPersonas: minVal,
+                  permiteEleccion: eleccionVal
+                });
+                
+                setServicioEditando({
+                  ...servicioEditando, 
+                  img: imgVal, 
+                  desc: descVal,
+                  minPersonas: minVal,
+                  permiteEleccion: eleccionVal
+                });
+                alert("Configuración de presentación guardada");
+              }} className="w-full bg-[#c1a57d] text-white py-2 rounded-lg font-bold text-[10px] uppercase shadow-sm hover:bg-[#a68d66]">Guardar Configuración</button>
             </div>
 
-            <p className="text-[10px] text-[#c4b198] mb-2 uppercase font-bold">Ítems del Menú (Checkboxes)</p>
+            <p className="text-[10px] text-[#c4b198] mb-2 uppercase font-bold">Ítems del Menú (Aparecerán según el switch)</p>
             <div className="space-y-2 mb-6 max-h-40 overflow-y-auto pr-2">
               {servicioEditando.items && servicioEditando.items.length > 0 ? (
                 servicioEditando.items.map((item, idx) => (
