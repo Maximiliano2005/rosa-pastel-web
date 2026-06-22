@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom'; // <-- CAMBIO AQUÍ: Ahora usamos useParams
 import { db } from './firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
 
 function ResponderReserva() {
-  const [searchParams] = useSearchParams();
+  // <-- CAMBIO AQUÍ: Capturamos 'estado' e 'id' directamente de la URL
+  const { estado, id } = useParams(); 
   const navigate = useNavigate();
   
-  const idReserva = searchParams.get('id');
-  const estadoInicial = searchParams.get('estado'); // 'aceptado' o 'rechazado'
+  const idReserva = id;
+  const estadoInicial = estado; // 'aceptado' o 'rechazado'
 
   const [reserva, setReserva] = useState(null);
   const [comentario, setComentario] = useState('');
