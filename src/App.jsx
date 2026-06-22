@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from './firebase'; 
 import { collection, onSnapshot } from 'firebase/firestore';
 import { Routes, Route, Link } from 'react-router-dom';
 import Admin from './Admin';
 import DetalleServicio from './DetalleServicio';
-import ResponderReserva from './ResponderReserva'; // <-- IMPORTAMOS LA NUEVA PÁGINA
+import ResponderReserva from './ResponderReserva'; // Importamos la nueva página
 
 function Home({ servicios }) {
   return (
@@ -75,8 +75,8 @@ function App() {
           <Route path="/" element={<Home servicios={servicios} />} />
           <Route path="/servicio/:nombreServicio" element={<DetalleServicio servicios={servicios} />} />
           
-          {/* REGISTRAMOS LA NUEVA RUTA AQUÍ EN LOS ROUTES */}
-          <Route path="/responder-reserva" element={<ResponderReserva />} />
+          {/* --- RUTA ACTUALIZADA CON EL FORMATO LIMPIO Y COMPRIMIDO --- */}
+          <Route path="/responder/:estado/:id" element={<ResponderReserva />} />
         </Routes>
       </main>
     </div>
