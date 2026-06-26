@@ -84,7 +84,6 @@ function Admin({ volver }) {
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${res.email}&su=Cotización Rosa Pastel&body=${cuerpo}`, '_blank');
   };
 
-  // --- FUNCIÓN AGREGADA PARA ABRIR WHATSAPP DIRECTO ---
   const abrirWhatsAppCliente = (res) => {
     let numLimpio = res.telefono ? res.telefono.replace(/\s+/g, '').replace('+', '') : '';
     if (!numLimpio.startsWith('56') && numLimpio.length > 0) {
@@ -184,7 +183,6 @@ function Admin({ volver }) {
                   <div className="flex-1">
                     <h2 className="text-lg font-bold">{res.nombre} <span className="text-[8px] bg-gray-100 px-2 rounded-full uppercase">{res.estado}</span></h2>
                     
-                    {/* INFO EXTRA Y HORA AGREGADOS AQUÍ */}
                     <p className="text-[10px] text-[#c4b198] font-bold uppercase">
                       {formatearFecha(res.fecha)} a las {res.hora || '--:--'} hrs • {res.invitados} pers • {res.tipoEvento}
                     </p>
@@ -195,7 +193,6 @@ function Admin({ volver }) {
                   </div>
                   <div className="flex flex-wrap md:flex-nowrap gap-2">
                     
-                    {/* BOTÓN DE WHATSAPP AGREGADO AQUÍ */}
                     <button onClick={() => abrirWhatsAppCliente(res)} className="bg-green-50 text-green-600 px-3 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-green-600 hover:text-white transition-colors">
                       💬 WhatsApp
                     </button>
@@ -243,7 +240,8 @@ function Admin({ volver }) {
                       img: '', 
                       desc: '',
                       minPersonas: 10,
-                      permiteEleccion: false
+                      permiteEleccion: false,
+                      exigeMinimo: true // Por defecto sí lo exigimos
                     }); 
                     setNuevoSrv(""); 
                   } 
@@ -307,8 +305,33 @@ function Admin({ volver }) {
 
               <div className="flex gap-4 items-center bg-white p-3 rounded-lg border border-[#efe4d5]">
                 <div className="flex-1">
-                  <label className="text-[10px] text-[#c1a57d] font-bold uppercase mb-1 block">Mínimo Personas</label>
-                  <input id="inputMinPersonas" type="number" min="1" defaultValue={servicioEditando.minPersonas || 10} className="w-full p-2 bg-[#fcf8f0] rounded-lg text-xs outline-none border border-[#efe4d5]" />
+                  <label className="flex items-center gap-1 text-[9px] text-[#c1a57d] font-bold uppercase cursor-pointer mb-1">
+                    <input 
+                      id="inputExigeMinimo" 
+                      type="checkbox" 
+                      defaultChecked={servicioEditando.exigeMinimo !== false} 
+                      className="accent-[#c1a57d] w-3 h-3 cursor-pointer" 
+                      onChange={(e) => {
+                        const inputMin = document.getElementById('inputMinPersonas');
+                        if (e.target.checked) {
+                          inputMin.disabled = false;
+                          inputMin.classList.remove('opacity-50');
+                        } else {
+                          inputMin.disabled = true;
+                          inputMin.classList.add('opacity-50');
+                        }
+                      }}
+                    />
+                    ¿Exigir Mínimo?
+                  </label>
+                  <input 
+                    id="inputMinPersonas" 
+                    type="number" 
+                    min="1" 
+                    defaultValue={servicioEditando.minPersonas || 10} 
+                    disabled={servicioEditando.exigeMinimo === false}
+                    className={`w-full p-2 bg-[#fcf8f0] rounded-lg text-xs outline-none border border-[#efe4d5] transition-opacity ${servicioEditando.exigeMinimo === false ? 'opacity-50' : ''}`} 
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="flex flex-col items-center gap-1 text-[9px] text-[#c1a57d] font-bold uppercase cursor-pointer mt-1">
@@ -323,12 +346,14 @@ function Admin({ volver }) {
                 const descVal = document.getElementById('inputDesc').value;
                 const minVal = Number(document.getElementById('inputMinPersonas').value);
                 const eleccionVal = document.getElementById('inputMenuEleccion').checked;
+                const exigeVal = document.getElementById('inputExigeMinimo').checked;
 
                 await updateDoc(doc(db, "servicios", servicioEditando.id), { 
                   img: imgVal, 
                   desc: descVal,
                   minPersonas: minVal,
-                  permiteEleccion: eleccionVal
+                  permiteEleccion: eleccionVal,
+                  exigeMinimo: exigeVal
                 });
                 
                 setServicioEditando({
@@ -336,7 +361,8 @@ function Admin({ volver }) {
                   img: imgVal, 
                   desc: descVal,
                   minPersonas: minVal,
-                  permiteEleccion: eleccionVal
+                  permiteEleccion: eleccionVal,
+                  exigeMinimo: exigeVal
                 });
                 alert("Configuración de presentación guardada");
               }} className="w-full bg-[#c1a57d] text-white py-2 rounded-lg font-bold text-[10px] uppercase shadow-sm hover:bg-[#a68d66]">Guardar Configuración</button>

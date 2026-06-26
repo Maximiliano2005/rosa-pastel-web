@@ -21,7 +21,8 @@ function DetalleServicio({ servicios }) {
     img: '', 
     desc: '', 
     minPersonas: 10, 
-    permiteEleccion: false 
+    permiteEleccion: false,
+    exigeMinimo: true // Por defecto asumimos que sí exige
   };
   
   // El menú seleccionado siempre empieza vacío []
@@ -60,10 +61,12 @@ function DetalleServicio({ servicios }) {
     e.preventDefault();
     if (!reserva.fecha) return alert("Por favor selecciona una fecha en el calendario");
 
-    // VALIDACIÓN: Revisar el mínimo de personas antes de enviar
-    const minRequerido = srvData.minPersonas || 1;
-    if (Number(reserva.invitados) < minRequerido) {
-      return alert(`Lo sentimos, el mínimo requerido para el servicio "${nombreServicio}" es de ${minRequerido} personas.`);
+    // VALIDACIÓN: Revisar el mínimo de personas SOLO si el servicio lo exige
+    if (srvData.exigeMinimo !== false) {
+      const minRequerido = srvData.minPersonas || 1;
+      if (Number(reserva.invitados) < minRequerido) {
+        return alert(`Lo sentimos, el mínimo requerido para el servicio "${nombreServicio}" es de ${minRequerido} personas.`);
+      }
     }
 
     setEnviando(true);
@@ -81,8 +84,11 @@ function DetalleServicio({ servicios }) {
       : 'Ninguno (A coordinar a medida)';
 
     const menuTexto = `\n\n--- MENÚ SELECCIONADO ---\n${itemsTexto}`;
+    
+    // Armamos la data final. Si no exige mínimo, ponemos "No aplica"
     const dataFinal = { 
       ...reserva, 
+      invitados: srvData.exigeMinimo !== false ? reserva.invitados : "No aplica",
       detalles: (reserva.detalles || "") + menuTexto, 
       estado: 'pendiente', 
       fechaRegistro: new Date().toLocaleString() 
@@ -192,19 +198,23 @@ function DetalleServicio({ servicios }) {
               
               {/* BLOQUE DIVIDIDO: INVITADOS Y HORA */}
               <div className="flex gap-4">
-                <div className="flex-1">
-                  <input 
-                    type="number" 
-                    placeholder={`Invitados`} 
-                    required 
-                    min={srvData.minPersonas || 1}
-                    className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" 
-                    onChange={e => setReserva({...reserva, invitados: e.target.value})} 
-                  />
-                  <p className="text-[10px] font-bold text-[#c4b198] ml-2 mt-1 uppercase">Mínimo: {srvData.minPersonas || 1}</p>
-                </div>
                 
-                {/* NUEVO CAMPO DE HORA */}
+                {/* CONDICIONAL: Solo mostrar "Invitados" si el servicio lo exige */}
+                {srvData.exigeMinimo !== false && (
+                  <div className="flex-1">
+                    <input 
+                      type="number" 
+                      placeholder={`Invitados`} 
+                      required 
+                      min={srvData.minPersonas || 1}
+                      className="w-full p-4 bg-[#fcf8f0] rounded-2xl outline-none" 
+                      onChange={e => setReserva({...reserva, invitados: e.target.value})} 
+                    />
+                    <p className="text-[10px] font-bold text-[#c4b198] ml-2 mt-1 uppercase">Mínimo: {srvData.minPersonas || 1}</p>
+                  </div>
+                )}
+                
+                {/* CAMPO DE HORA (Se expande solo si desaparece Invitados) */}
                 <div className="flex-1">
                   <input 
                     type="time" 
