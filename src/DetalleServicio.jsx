@@ -22,7 +22,7 @@ function DetalleServicio({ servicios }) {
     desc: '', 
     minPersonas: 10, 
     permiteEleccion: false,
-    exigeMinimo: true // Por defecto asumimos que sí exige
+    exigeMinimo: true
   };
   
   // El menú seleccionado siempre empieza vacío []
@@ -104,7 +104,7 @@ function DetalleServicio({ servicios }) {
 
       await emailjs.send('service_skm23ep', 'template_vhlomqs', dataParaEmail, '56AEmrh5uSxllA5ot');
       
-      alert("¡Solicitud enviada con éxito!");
+      alert("¡Solicitud enviada con éxito! 🎉\n\nTe hemos enviado un correo con el detalle. Por favor, revisa tu bandeja de entrada o la carpeta de SPAM / Correo no deseado.");
       navigate('/');
     } catch (err) { 
       alert("Error al enviar"); 
@@ -115,7 +115,7 @@ function DetalleServicio({ servicios }) {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 pb-20">
+    <div className="max-w-5xl mx-auto px-4 pb-32"> {/* Aumenté el espacio abajo para que el botón no tape contenido final */}
       <button onClick={() => navigate('/')} className="mb-8 text-[10px] font-bold uppercase tracking-widest text-[#c4b198] hover:text-[#c1a57d]">
         ← Volver al catálogo
       </button>
@@ -131,7 +131,7 @@ function DetalleServicio({ servicios }) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start mb-4">
           <img src={srvData.img ? `/img/${srvData.img}` : '/logo.png'} alt={nombreServicio} className="rounded-[2.5rem] w-full h-80 object-cover shadow-md" />
           <div className="space-y-4">
             <h3 className="text-xl font-serif text-[#c1a57d] italic mb-6">
@@ -166,14 +166,15 @@ function DetalleServicio({ servicios }) {
           </div>
         </div>
 
+        {/* --- NUEVO BOTÓN FLOTANTE / STICKY --- */}
         {!mostrarForm && (
-          <div className="text-center border-t border-[#fcf8f0] pt-8">
+          <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-[#efe4d5] py-4 px-4 flex justify-center z-40 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] animate-in fade-in slide-in-from-bottom-5 duration-300">
             <button 
               onClick={() => {
                 setMostrarForm(true);
                 setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
               }}
-              className="px-12 py-5 bg-[#c1a57d] text-white font-bold rounded-2xl uppercase tracking-widest shadow-xl hover:bg-[#a68d66] transition-all transform hover:scale-105"
+              className="max-w-md w-full py-4 bg-[#c1a57d] text-white font-bold rounded-2xl uppercase tracking-widest shadow-lg hover:bg-[#a68d66] transition-all text-center text-sm"
             >
               Siguiente: Datos de Contacto →
             </button>
